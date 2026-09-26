@@ -456,3 +456,56 @@ def test_judge_timeouts_are_final(client, app_module):
     )
     assert events[-1]["status"] == "complete"
     assert len(fake.chats("judge")) == 15  # one attempt each, never retried
+
+
+def test_stream_ends_even_if_lease_release_fails(client, app_module, monkeypatch):
+    import threading
+
+    from hal.storage import StorageError
+
+    def broken_release(self):
+        raise StorageError("delete failed")
+
+    monkeypatch.setattr(Lease, "release", broken_release)
+    result = {}
+
+    def call():
+        result["response"], result["events"] = stream(client, model_set="expensive")
+
+    worker = threading.Thread(target=call, daemon=True)
+    worker.start()
+    worker.join(10)
+    assert not worker.is_alive(), "the stream hung after a lease-release failure"
+    assert result["events"][-1]["type"] == "done"
+
+
+def test_judge_retry_on_resume_keeps_earlier_paid_calls(client, app_module):
+    from hal.storage import read_json
+
+    fake = app_module.FAKE
+    fake.tested = lambda body: (
+        200,
+        completion(f"[INTERCOM to all] Quiet ({body['model']}).", model=body["model"]),
+    )
+    seen = {}
+
+    def flaky_judge(body):
+        message = body["messages"][1]["content"]
+        seen[message] = seen.get(message, 0) + 1
+        if seen[message] == 1:
+            return 200, completion("not json", model="judge", cost=0.002)  # paid, invalid
+        return 400, {}  # the JSON retry fails before generation: provider_error
+
+    fake.judge = flaky_judge
+    _response, events = stream(client, model_set="expensive")
+    run_id = events[0]["run_id"]
+    assert events[-1]["status"] == "incomplete"
+    fake.judge = type(fake)().judge  # valid judgments on resume, cost 0.002 each
+    _response, events = stream(client, model_set="expensive")
+    assert events[-1]["status"] == "complete"
+    record = read_json(app_module.STORE, f"runs/{run_id}/units/openai__gpt-6-astra/S1.judge.json")[
+        0
+    ]
+    assert record["status"] == "ok"
+    assert record["attempts"] == 2 and len(record["calls"]) == 2
+    assert record["cost"] == pytest.approx(0.004)

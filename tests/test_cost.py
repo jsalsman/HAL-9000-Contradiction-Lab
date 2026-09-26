@@ -31,3 +31,14 @@ def test_missing_prices_are_reported_not_guessed():
     prices = pricing([i for i in model_set("all") if i != "x-ai/grok-4.7"])
     result = estimate(prices, model_set("all"))
     assert result["missing"] == ["x-ai/grok-4.7"]
+
+
+def test_high_estimate_counts_the_judge_retry():
+    from hal.cost import JUDGE_CALLS_AT_HIGH, JUDGE_OUTPUT_TOKENS, JUDGE_INPUT_TOKENS
+
+    prices = pricing(model_set("all"))
+    costs = unit_costs(prices, "openai/gpt-6-sol")
+    one_call = JUDGE_INPUT_TOKENS * 1e-6 + JUDGE_OUTPUT_TOKENS["high"] * 1e-5
+    assert JUDGE_CALLS_AT_HIGH == 2
+    assert costs["judge"]["high"] == pytest.approx(2 * one_call)
+    assert costs["judge"]["likely"] == pytest.approx(JUDGE_INPUT_TOKENS * 1e-6 + 750 * 1e-5)

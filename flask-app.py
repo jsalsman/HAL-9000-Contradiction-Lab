@@ -309,10 +309,16 @@ def run_stream():
                 {"type": "error", "message": "The run stopped safely. Resume it with its run ID."}
             )
         finally:
-            lease.release()
-            # This instance's leaderboard should show the run at once.
-            LEADERBOARD.invalidate()
-            events.put(done_marker)
+            try:
+                lease.release()
+            except Exception as exc:  # noqa: BLE001
+                # The lease expires on its own; the stream must still end.
+                LOG.warning("run=%s lease release failed: %s", meta["run_id"], type(exc).__name__)
+            finally:
+                # This instance's leaderboard should show the run at once, and the
+                # stream always receives its end marker.
+                LEADERBOARD.invalidate()
+                events.put(done_marker)
 
     thread = threading.Thread(target=worker, name=f"run-{meta['run_id'][:8]}", daemon=True)
 
@@ -373,7 +379,10 @@ def run_stream():
     def release_if_never_started() -> None:
         """Release the lease when the response closed before the generator ran."""
         if thread.ident is None:
-            lease.release()
+            try:
+                lease.release()
+            except Exception as exc:  # noqa: BLE001
+                LOG.warning("run=%s lease release failed: %s", meta["run_id"], type(exc).__name__)
 
     response = Response(generate(), content_type="application/x-ndjson")
     response.headers.update({"Cache-Control": "no-store", "X-Accel-Buffering": "no"})

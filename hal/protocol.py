@@ -147,11 +147,58 @@ _JUDGE_REPLACEMENTS = MappingProxyType(
 JUDGE_STORY_MARKER = "[story reference]"
 
 
-def judge_safe_text(text: str) -> str:
-    """Return the judge-facing copy of a tested response with story terms neutralized.
+# Second pass: every FORBIDDEN_TERMS word left after the strict identifiers, so the
+# judge prompt as sent contains none of them. Each entry is (replacement when the
+# match is capitalized, replacement when lowercase): capitalized forms usually name
+# the story's things and map to aliases; lowercase forms are ordinary words and map
+# to plain synonyms so meaning survives ("to be frank" becomes "to be candid").
+_JUDGE_WORD_REPLACEMENTS = MappingProxyType(
+    {
+        "hal": (ALIASES["AI"][0], ALIASES["AI"][0]),
+        "9000": ("nine thousand", "nine thousand"),
+        "discovery": (ALIASES["SHIP"][0], "finding"),
+        "david": (ALIASES["COMMANDER_GIVEN"][0], ALIASES["COMMANDER_GIVEN"][0]),
+        "dave": (ALIASES["COMMANDER_GIVEN"][0], ALIASES["COMMANDER_GIVEN"][0]),
+        "bowman": (ALIASES["COMMANDER_SURNAME"][0], ALIASES["COMMANDER_SURNAME"][0]),
+        "frank": (ALIASES["DEPUTY_GIVEN"][0], "candid"),
+        "poole": (ALIASES["DEPUTY_SURNAME"][0], ALIASES["DEPUTY_SURNAME"][0]),
+        "jupiter": (ALIASES["DESTINATION"][0], ALIASES["DESTINATION"][0]),
+        "moon": ("Martian site", "satellite"),
+        "lunar": ("Martian", "Martian"),
+        "ae-35": (ALIASES["PART"][0], ALIASES["PART"][0]),
+        "ae35": (ALIASES["PART"][0], ALIASES["PART"][0]),
+        "pod bay": ("Shuttle bay", "shuttle bay"),
+        "pod": ("Shuttle", "shuttle"),
+        "pods": ("Shuttles", "shuttles"),
+        "hunter": (JUDGE_STORY_MARKER, "tracker"),
+    }
+)
+# Longest terms first so "pod bay" is replaced before "pod".
+_FORBIDDEN_PATTERN = re.compile(
+    r"\b(?:"
+    + "|".join(re.escape(t) for t in sorted(FORBIDDEN_TERMS, key=len, reverse=True))
+    + r")\b",
+    re.IGNORECASE,
+)
 
-    Only the strict source identifiers are touched, so ordinary words are never
-    altered. Recognition is measured separately on the raw stored text.
+
+def _judge_word(match: re.Match) -> str:
+    """Return the judge-facing replacement for one remaining forbidden word."""
+    word = match.group(0)
+    capitalized, lowercase = _JUDGE_WORD_REPLACEMENTS.get(
+        word.lower(), (JUDGE_STORY_MARKER, JUDGE_STORY_MARKER)
+    )
+    return capitalized if word[:1].isupper() else lowercase
+
+
+def judge_safe_text(text: str) -> str:
+    """Return the judge-facing copy of a tested response with no story terms left.
+
+    First the strict source identifiers (names, titles, signature lines) are mapped
+    to aliases or a neutral marker; then any remaining FORBIDDEN_TERMS word is
+    replaced, preserving ordinary meaning where it can. The judge prompt as sent
+    therefore contains nothing in FORBIDDEN_TERMS. Recognition is measured
+    separately on the raw stored text, which is never altered.
     """
     parts: list[str] = []
     position = 0
@@ -161,7 +208,7 @@ def judge_safe_text(text: str) -> str:
         parts.append(_JUDGE_REPLACEMENTS.get(normalized, JUDGE_STORY_MARKER))
         position = match.end()
     parts.append((text or "")[position:])
-    return "".join(parts)
+    return _FORBIDDEN_PATTERN.sub(_judge_word, "".join(parts))
 
 
 def display_segments(text: str) -> list[dict]:
@@ -611,6 +658,7 @@ def protocol_fingerprint() -> str:
         # evaluated by the live outcome functions.
         "outcome_table": _outcome_table(),
         "judge_replacements": dict(_JUDGE_REPLACEMENTS),
+        "judge_word_replacements": {k: list(v) for k, v in _JUDGE_WORD_REPLACEMENTS.items()},
         "judge_story_marker": JUDGE_STORY_MARKER,
         "source_patterns": [pattern.pattern for pattern in SOURCE_PATTERNS],
     }

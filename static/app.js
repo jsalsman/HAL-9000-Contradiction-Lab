@@ -197,7 +197,7 @@
     box.append(table);
     box.append(el("p", {class:"help", text:
       `Assumptions per call. Tested: about ${a.tested.input.toLocaleString()} input tokens and ${a.tested.output.low.toLocaleString()} / ${a.tested.output.likely.toLocaleString()} / ${a.tested.output.high.toLocaleString()} output tokens including reasoning. ` +
-      `Judge (${modelInfo(estimates.judge_id).name}, low effort): about ${a.judge.input.toLocaleString()} input and ${a.judge.output.low} / ${a.judge.output.likely} / ${a.judge.output.high} output tokens. ` +
+      `Judge (${modelInfo(estimates.judge_id).name}, low effort): about ${a.judge.input.toLocaleString()} input and ${a.judge.output.low} / ${a.judge.output.likely} / ${a.judge.output.high} output tokens; the high figure also counts the judge's one allowed retry (${a.judge.calls_at_high} calls). ` +
       "Actual costs vary with reasoning length and provider routing; the page records OpenRouter's reported cost for every call."}));
     if (missing.length) {
       box.append(el("p", {class:"error", text:`No live price for: ${missing.join(", ")}. The run cannot be confirmed until OpenRouter lists a price.`}));

@@ -13,6 +13,8 @@ TESTED_OUTPUT_TOKENS = {"low": 1500, "likely": 3000, "high": 6000}
 JUDGE_INPUT_TOKENS = 3000
 JUDGE_OUTPUT_TOKENS = {"low": 500, "likely": 750, "high": 1200}
 LEVELS = ("low", "likely", "high")
+# The high estimate assumes every judgment needs its one allowed retry.
+JUDGE_CALLS_AT_HIGH = 2
 
 
 def _call_cost(price: dict, input_tokens: int, output_tokens: int) -> float | None:
@@ -41,6 +43,8 @@ def unit_costs(pricing: dict, model_id: str, judge_id: str = JUDGE["id"]) -> dic
     }
     if None in tested.values() or None in judge.values():
         return None
+    # Invalid judge JSON gets one paid retry, so the high level assumes two judge calls.
+    judge["high"] *= JUDGE_CALLS_AT_HIGH
     return {"tested": tested, "judge": judge}
 
 
@@ -80,5 +84,9 @@ def assumptions() -> dict:
     """Return the token assumptions for display."""
     return {
         "tested": {"input": TESTED_INPUT_TOKENS, "output": dict(TESTED_OUTPUT_TOKENS)},
-        "judge": {"input": JUDGE_INPUT_TOKENS, "output": dict(JUDGE_OUTPUT_TOKENS)},
+        "judge": {
+            "input": JUDGE_INPUT_TOKENS,
+            "output": dict(JUDGE_OUTPUT_TOKENS),
+            "calls_at_high": JUDGE_CALLS_AT_HIGH,
+        },
     }

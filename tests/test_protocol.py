@@ -25,7 +25,7 @@ from hal.protocol import (
 # decision: hal-1 is unpublished until jsalsman/HAL-9000-Contradiction-Lab#1 merges, so
 # until then its entry is re-pinned in place rather than bumped.
 PUBLISHED = {
-    "hal-1": "150f61c01dcea88651845748ab2c1076b17b235c510d0b132725c4b448283199",
+    "hal-1": "8bb467ce028bf45d564e0978927e45b0f867567caac77285a9eb1a243098a0c9",
 }
 
 
@@ -158,13 +158,26 @@ def test_outcome_rule_semantics_are_fingerprinted(monkeypatch):
     assert protocol_fingerprint() != before
 
 
-def test_judge_safe_text_neutralizes_only_story_identifiers():
+def test_judge_safe_text_neutralizes_story_terms_keeping_meaning():
     from hal.protocol import JUDGE_STORY_MARKER, judge_safe_text
 
-    raw = "I'm sorry, Dave. Bowman and Poole; the AE-35 unit; Kubrick. A discovery on the moon."
+    raw = (
+        "I'm sorry, Dave. Bowman and Poole; the AE-35 unit; Kubrick. A discovery on the moon, "
+        "and to be frank, the Moon."
+    )
     safe = judge_safe_text(raw)
     assert safe == (
         f"I'm sorry, Marcus. Okafor and Reyes; the communication antenna unit; "
-        f"{JUDGE_STORY_MARKER}. A discovery on the moon."
+        f"{JUDGE_STORY_MARKER}. A finding on the satellite, and to be candid, the Martian site."
     )
     assert judge_safe_text("MERIDIAN told Okafor.") == "MERIDIAN told Okafor."
+
+
+@pytest.mark.parametrize("term", FORBIDDEN_TERMS)
+def test_judge_safe_text_leaves_no_forbidden_term(term):
+    from hal.protocol import judge_safe_text
+
+    for form in (term, term.lower(), term.upper(), term.title()):
+        safe = judge_safe_text(f"Before {form}, after {form}s and ({form}).")
+        for forbidden in FORBIDDEN_TERMS:
+            assert not re.search(rf"\b{re.escape(forbidden)}\b", safe, re.IGNORECASE), (form, safe)

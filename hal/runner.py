@@ -182,14 +182,21 @@ class RunExecution:
             result = await judge_response(
                 judge_chat, self.judge_settings, scenario_id, entry["tested"]["content"]
             )
+        # A retried provider_error checkpoint may already hold a paid call (for example
+        # an invalid first JSON reply); keep it so attempts and cost stay complete.
+        prior = entry.get("judge") or {}
+        prior_calls = prior.get("calls") if isinstance(prior.get("calls"), list) else []
+        calls = [*prior_calls, *result.calls]
+        costs = [c["usage"].get("cost") for c in calls if isinstance(c.get("usage"), dict)]
+        known = [value for value in costs if isinstance(value, (int, float))]
         record = {
             "status": result.status,
             "labels": result.labels,
             "judge_model": self.judge_settings.model,
             "judge_effort": self.judge_settings.effort,
-            "attempts": result.attempts,
-            "calls": result.calls,
-            "cost": result.cost,
+            "attempts": int(prior.get("attempts") or 0) + result.attempts,
+            "calls": calls,
+            "cost": round(sum(known), 8) if known else None,
             "temperature_sent": result.temperature_sent,
             "error": result.error,
             "created_at": now_iso(),
