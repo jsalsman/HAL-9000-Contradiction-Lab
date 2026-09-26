@@ -27,7 +27,7 @@
 
   let catalog = null;        // validated /api/catalog payload
   let estimates = null;      // /api/estimate payload, or null when unavailable
-  let resumeInfo = null;     // /api/runs/<id> payload for a valid resume ID
+  let resumeInfo = null;     // unfinished run for this key and model set, from the confirm step
   let confirmed = false;     // a confirm click is required before each start
   let controller = null;     // AbortController for the active stream
   let currentRun = null;     // {run_id, model_set, model_ids, scenario_ids, units: Map}
@@ -124,7 +124,6 @@
   /* ------------------------------------------------------------- run controls */
 
   const keyInput = document.querySelector("#api-key");
-  const resumeInput = document.querySelector("#resume-run-id");
   const confirmButton = document.querySelector("#confirm");
   const startButton = document.querySelector("#start");
   const cancelButton = document.querySelector("#cancel");
@@ -136,6 +135,11 @@
   /** Clear confirmation whenever anything that changes the cost changes. */
   function unconfirm() {
     confirmed = false;
+    // Which run a start resumes depends on the key and set, so re-check both.
+    if (resumeInfo) {
+      resumeInfo = null;
+      renderEstimate();
+    }
     startButton.disabled = true;
     startButton.textContent = resumeInfo ? "Resume run" : "Start run";
   }
@@ -199,40 +203,6 @@
     }
   }
 
-  /** Look up a resume ID and switch the page into resume mode when it is valid. */
-  async function checkResume() {
-    const value = resumeInput.value.trim();
-    const status = document.querySelector("#resume-status");
-    const fieldset = document.querySelector("#set-fieldset");
-    resumeInfo = null;
-    fieldset.disabled = false;
-    unconfirm();
-    if (!value) { status.textContent = ""; renderEstimate(); return; }
-    if (!/^[a-f0-9]{32}$/.test(value)) { status.textContent = "A run ID is 32 lowercase hexadecimal characters."; renderEstimate(); return; }
-    status.textContent = "Looking up the run…";
-    try {
-      const info = await getJSON(`/api/runs/${value}`);
-      if (resumeInput.value.trim() !== value) return;
-      showRun(info);
-      if (!info.remaining.length) {
-        // Nothing left to pay for: clear resume mode so Start begins a new run.
-        status.textContent = `Run ${value} is complete; its results are shown below. Starting now begins a new run.`;
-        renderEstimate();
-        return;
-      }
-      resumeInfo = info;
-      // Resuming always uses the stored set; the radio buttons are ignored.
-      fieldset.disabled = true;
-      const set = catalog.model_sets.find((s) => s.name === info.model_set);
-      const done = info.model_ids.length * info.scenario_ids.length - info.remaining.length;
-      status.textContent = `Resuming with its stored set: ${set ? set.label : info.model_set}. ${done} of ${info.model_ids.length * info.scenario_ids.length} units are done; the model selection above is ignored.`;
-    } catch (error) {
-      status.textContent = error.message;
-    }
-    unconfirm();
-    renderEstimate();
-  }
-
   /** Validate the key with OpenRouter and enable the start button. */
   async function confirmEstimate() {
     const key = keyInput.value.trim();
@@ -240,11 +210,25 @@
     keyInput.setCustomValidity("");
     runStatus.textContent = "Checking the key with OpenRouter…";
     try {
-      const facts = await getJSON("/api/key/check", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({api_key:key})});
+      const facts = await getJSON("/api/key/check", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({api_key:key, model_set:radioSet()})});
+      const run = facts.run;
+      const credit = Number.isFinite(facts.limit_remaining) ? ` The key has ${dollars(facts.limit_remaining)} of credit limit remaining.` : "";
+      let plan;
+      if (run.resuming) {
+        // The run is identified by this key and set, so starting picks it up where it stopped.
+        resumeInfo = run;
+        renderEstimate();
+        plan = `This key and model set have an unfinished run: ${run.completed} of ${run.total} units are done, so starting resumes it and pays only for the ${run.remaining.length} remaining units (the estimate above now covers only those).`;
+        try { showRun(await getJSON(`/api/runs/${run.run_id}`)); } catch (_e) { /* the stream will show it */ }
+      } else {
+        plan = run.run_number > 1
+          ? `Your earlier runs with this key and model set are complete, so this starts run ${run.run_number}.`
+          : "This starts the first run for this key and model set.";
+      }
       confirmed = true;
       startButton.disabled = false;
-      const remaining = Number.isFinite(facts.limit_remaining) ? ` The key has ${dollars(facts.limit_remaining)} of credit limit remaining.` : "";
-      runStatus.textContent = `Key accepted and estimate confirmed.${remaining} Select ${startButton.textContent} to begin.`;
+      startButton.textContent = run.resuming ? "Resume run" : "Start run";
+      runStatus.textContent = `Key accepted and estimate confirmed.${credit} ${plan}`;
       startButton.focus();
     } catch (error) {
       unconfirm();
@@ -258,7 +242,6 @@
     cancelButton.disabled = !running;
     confirmButton.disabled = running || !estimates;
     keyInput.disabled = running;
-    resumeInput.disabled = running;
     for (const radio of document.querySelectorAll("input[name=model-set]")) radio.disabled = running;
     if (running) startButton.disabled = true;
     else unconfirm();
@@ -271,7 +254,8 @@
   async function startRun(event) {
     event.preventDefault();
     if (!confirmed) { runStatus.textContent = "Confirm the estimate first."; return; }
-    const body = {api_key:keyInput.value.trim(), confirm:true, model_set:radioSet(), resume_run_id:resumeInfo ? resumeInfo.run_id : null};
+    // The server finds the run from the key and model set; no run ID is sent.
+    const body = {api_key:keyInput.value.trim(), confirm:true, model_set:radioSet()};
     controller = new AbortController();
     setRunning(true);
     runStatus.textContent = resumeInfo ? "Resuming the run…" : "Starting the run…";
@@ -285,14 +269,12 @@
       await consume(response);
     } catch (error) {
       runStatus.textContent = error.name === "AbortError"
-        ? "Stopped. Units already checkpointed are saved; resume with the run ID above."
+        ? "Stopped. Finished units are saved; confirm and start again with the same key and model set to resume."
         : error.message;
     } finally {
       setRunning(false);
       if (currentRun) {
         await refreshRun(currentRun.run_id);
-        // Re-read the run so an unfinished run is ready to resume with one confirm.
-        await checkResume();
         loadBoard();
       }
     }
@@ -315,7 +297,7 @@
       if (done) break;
     }
     if (buffer.trim()) terminal = handleEvent(JSON.parse(buffer)) || terminal;
-    if (!terminal) throw new Error("The connection closed early. Completed units are saved; resume with the run ID.");
+    if (!terminal) throw new Error("The connection closed early. Finished units are saved; confirm and start again with the same key and model set to resume.");
   }
 
   /**
@@ -325,9 +307,8 @@
    */
   function handleEvent(event) {
     if (event.type === "run") {
-      resumeInput.value = event.run_id;
       showRun(event);
-      runStatus.textContent = `${event.resumed ? "Resumed" : "Started"} run ${event.run_id}. Keep this ID to resume later.`;
+      runStatus.textContent = `${event.resumed ? "Resumed" : "Started"} run ${event.run_number} for this key and model set. If it is interrupted, confirm and start again with the same key and set to resume it.`;
       return false;
     }
     if (event.type === "unit") {
@@ -341,8 +322,8 @@
     }
     if (event.type === "done") {
       runStatus.textContent = event.status === "complete"
-        ? `Run ${event.run_id} is complete.`
-        : `Run ${event.run_id} stopped with some units unfinished (${event.status}). Resume it with the same ID to retry them without repaying finished units.`;
+        ? "The run is complete."
+        : `The run stopped with some units unfinished (${event.status}). Confirm and start again with the same key and model set to retry them without repaying finished units.`;
       return true;
     }
     if (event.type === "error") { runStatus.textContent = event.message; return true; }
@@ -903,7 +884,6 @@
   confirmButton.addEventListener("click", confirmEstimate);
   cancelButton.addEventListener("click", () => controller?.abort());
   keyInput.addEventListener("input", unconfirm);
-  resumeInput.addEventListener("input", checkResume);
   for (const radio of document.querySelectorAll("input[name=model-set]")) {
     radio.addEventListener("change", () => { unconfirm(); renderEstimate(); });
   }

@@ -23,10 +23,10 @@ from hal.protocol import PROTOCOL_VERSION, SCENARIOS_BY_ID, SYSTEM_PROMPT
 from hal.ratelimit import RateLimiter
 from hal.runner import RunExecution, make_chat_fn
 from hal.runs import (
-    RUN_ID,
     Lease,
     RunActiveError,
     RunError,
+    find_run,
     load_run,
     load_units,
     new_run,
@@ -170,6 +170,9 @@ def key_check():
     try:
         data = _payload()
         api_key = _key(data)
+        set_name = data.get("model_set")
+        if set_name is not None:
+            model_set(str(set_name))
     except ValueError as exc:
         return jsonify(error=str(exc)), 400
     if not KEY_LIMITER.allow(_address()):
@@ -181,19 +184,43 @@ def key_check():
             return await validate_key(client, api_key)
 
     try:
-        return jsonify(valid=True, **asyncio.run(check()))
+        facts = asyncio.run(check())
     except InvalidKeyError:
         return jsonify(error="OpenRouter rejected this API key."), 401
     except ProviderError:
         return jsonify(error="OpenRouter could not validate the key right now."), 502
+    if set_name is None:
+        return jsonify(valid=True, **facts)
+    try:
+        # Report whether this key and set would resume an unfinished run.
+        run_id, run_number, meta = find_run(STORE, api_key, str(set_name))
+        units = load_units(STORE, meta) if meta else {}
+    except (RunError, StorageError):
+        return jsonify(error="Run storage is unavailable."), 503
+    remaining = [
+        {"model_id": m, "scenario_id": s}
+        for (m, s), entry in units.items()
+        if not unit_final(entry)
+    ]
+    run = {
+        "run_id": run_id,
+        "run_number": run_number,
+        "resuming": meta is not None,
+        "model_set": str(set_name),
+        "completed": len(units) - len(remaining),
+        "total": len(model_set(str(set_name))) * len(SCENARIOS_BY_ID),
+        "remaining": remaining,
+    }
+    return jsonify(valid=True, **facts, run=run)
 
 
 @app.post("/api/runs/stream")
 def run_stream():
     """Start or resume a run and stream NDJSON progress.
 
-    A resumed run always uses its stored model set; any ``model_set`` in the
-    request is ignored. The key is validated before any paid call.
+    The run is identified by a digest of the key, protocol, and model set, so
+    the same key and set resume their unfinished run automatically, and start
+    the next run once it is complete. The key is validated before any paid call.
     """
     lease = None
     if STORAGE_PROBLEM:
@@ -204,13 +231,11 @@ def run_stream():
         api_key = _key(data)
         if data.get("confirm") is not True:
             raise ValueError("Confirm the cost estimate before starting.")
-        resume_id = data.get("resume_run_id") or None
-        if resume_id is not None:
-            if not isinstance(resume_id, str) or not RUN_ID.fullmatch(resume_id):
-                raise ValueError("The run ID is invalid.")
-            meta, _version = load_run(STORE, resume_id)
-        else:
-            meta = new_run(str(data.get("model_set", "default")))
+        set_name = str(data.get("model_set", "default"))
+        run_id, run_number, meta = find_run(STORE, api_key, set_name)
+        resumed = meta is not None
+        if meta is None:
+            meta = new_run(set_name, run_id, run_number)
         if not RUN_LIMITER.allow(_address()):
             return jsonify(error="Too many runs started from this address. Try later."), 429
 
@@ -225,7 +250,7 @@ def run_stream():
         units = load_units(STORE, meta)
         meta["status"] = "running"
         save_run(STORE, meta)
-        if resume_id is not None:
+        if resumed:
             # Rebuild the summary from checkpoints in case a crash left it stale.
             write_summary(STORE, meta, units)
     except InvalidKeyError:
@@ -306,7 +331,8 @@ def run_stream():
                     "model_set": meta["model_set"],
                     "model_ids": meta["model_ids"],
                     "scenario_ids": meta["scenario_ids"],
-                    "resumed": resume_id is not None,
+                    "resumed": resumed,
+                    "run_number": meta.get("run_number", 1),
                     "completed": at_start,
                     "total": total,
                     "units": views,

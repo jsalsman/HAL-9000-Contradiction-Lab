@@ -9,6 +9,7 @@
   <script src="static/app.js" defer></script>
 </head>
 <body>
+  <div class="stars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
   <a class="skip" href="#leaderboard-title">Skip to leaderboard</a>
   <header class="site-header">
     <div class="brand"><a href="https://github.com/jsalsman/hal-9000-contradiction-lab">HAL 9000 Contradiction Lab</a></div>
@@ -35,10 +36,7 @@
           <div class="radio"><input type="radio" id="set-all" name="model-set" value="all"><label for="set-all">All 20 models (100 units)</label></div>
         </fieldset>
 
-        <label for="resume-run-id">Resume run ID (optional)</label>
-        <input id="resume-run-id" type="text" inputmode="text" pattern="[a-f0-9]{32}" maxlength="32" autocomplete="off" spellcheck="false" aria-describedby="resume-help">
-        <p id="resume-help" class="help">A resumed run keeps its original model set and skips every unit already paid for.</p>
-        <p id="resume-status" class="help" role="status" aria-live="polite"></p>
+        <p class="help">Runs are identified by a one-way hash of your key and the model set, so there is no run ID to keep. If a run is interrupted, enter the same key, choose the same set, and confirm again: the run resumes and never repays finished units. Once it is complete, the same key and set start a new run.</p>
 
         <div id="estimate" class="estimate" aria-live="polite">Loading live OpenRouter prices…</div>
 

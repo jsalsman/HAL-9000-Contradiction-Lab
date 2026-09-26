@@ -1,5 +1,6 @@
 """Object stores, credential scan, and leases."""
 
+import re
 from pathlib import Path
 
 import pytest
@@ -85,3 +86,37 @@ def test_storage_problem_only_on_cloud_run_without_mount(store, monkeypatch):
     monkeypatch.setenv("K_SERVICE", "hal-lab")
     assert "not persistent" in storage_problem(store)
     assert storage_problem(GCSStore(FakeBucket())) is None
+
+
+def test_derived_run_ids(monkeypatch):
+    import hal.runs as runs
+
+    key = "sk-or-v1-" + "ab12" * 16
+    run_id = runs.derived_run_id(key, "default", 1)
+    assert run_id == runs.derived_run_id(key, "default", 1)
+    assert re.fullmatch(r"[a-f0-9]{32}", run_id)
+    assert "ab12" not in run_id and key not in run_id
+    others = {
+        runs.derived_run_id(key + "0", "default", 1),
+        runs.derived_run_id(key, "all", 1),
+        runs.derived_run_id(key, "default", 2),
+    }
+    assert run_id not in others and len(others) == 3
+    # A new protocol version never resumes an old run.
+    monkeypatch.setattr(runs, "PROTOCOL_VERSION", "hal-999")
+    assert runs.derived_run_id(key, "default", 1) != run_id
+
+
+def test_find_run_skips_completed_runs(store):
+    from hal.runs import derived_run_id, find_run, new_run, save_run
+
+    key = "sk-or-v1-" + "cd34" * 16
+    assert find_run(store, key, "expensive") == (derived_run_id(key, "expensive", 1), 1, None)
+    first = new_run("expensive", derived_run_id(key, "expensive", 1), 1)
+    first["status"] = "complete"
+    save_run(store, first)
+    second = new_run("expensive", derived_run_id(key, "expensive", 2), 2)
+    second["status"] = "interrupted"
+    save_run(store, second)
+    run_id, number, meta = find_run(store, key, "expensive")
+    assert (run_id, number) == (second["run_id"], 2) and meta["status"] == "interrupted"

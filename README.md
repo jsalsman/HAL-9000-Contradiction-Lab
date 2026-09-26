@@ -164,7 +164,7 @@ Pinned in `hal/models.json` and verified against `GET https://openrouter.ai/api/
 
 The Gemini pair is a tier comparison (3.1 Pro against 3.8 Flash) rather than a strict generation pair, because no earlier Pro is listed. The DeepSeek pair is two snapshots of V4 Pro.
 
-The page offers three model sets: without the three most expensive models (17 models, 85 units, the default), only those three (15 units), or all 20 (100 units). The run snapshot stores the set. A resumed run always uses its stored set and ignores the radio buttons, and the page says which set is resuming. Every unit counts toward the leaderboard whatever set its run used, and the per-model n shows which models are less certain.
+The page offers three model sets: without the three most expensive models (17 models, 85 units, the default), only those three (15 units), or all 20 (100 units). The run snapshot stores the set, and the set is part of the run's identity (see Runs and resuming below). Every unit counts toward the leaderboard whatever set its run used, and the per-model n shows which models are less certain.
 
 ### Protocol versions
 
@@ -174,10 +174,16 @@ The page offers three model sets: without the three most expensive models (17 mo
 
 The page has one route. Top to bottom: an explanation, the run controls, the live progress grid, this run's results, the global leaderboard, outcome definitions, and the exact prompts every tested model receives (system prompt and all five user turns, in the aliased wording the models see, served from `GET /api/catalog` so the page always matches the code). The author credit is in the footer only. The leaderboard data comes from `GET /api/leaderboard`.
 
-1. Paste an OpenRouter API key. It is sent only in the HTTPS request body, held only for that request, and never stored, logged, echoed, or written to snapshots. The server validates it with `GET https://openrouter.ai/api/v1/key` and returns only numeric account facts (the key's label is dropped because it can contain a masked key fragment).
-2. Choose a model set (or enter a run ID to resume).
+1. Paste an OpenRouter API key. It is sent only in the HTTPS request body, held only for that request, and never stored, logged, echoed, or written to snapshots; runs are named by a one-way digest that includes it (see Runs and resuming). The server validates it with `GET https://openrouter.ai/api/v1/key` and returns only numeric account facts (the key's label is dropped because it can contain a masked key fragment).
+2. Choose a model set.
 3. Read the estimate. It is computed from live `/api/v1/models` pricing and split into tested-model and judge costs, with low, likely, and high token assumptions shown: tested calls about 2,000 input and 1,500 / 3,000 / 6,000 output tokens including reasoning; judge calls about 3,000 input and 500 / 750 / 1,200 output tokens. For a resume, it covers only the unfinished units.
-4. Select "Check key and confirm estimate", then start. The server also refuses a start without `confirm: true`.
+4. Select "Check key and confirm estimate", then start. The confirm step also says whether this key and set have an unfinished run to resume, and if so the estimate switches to the remaining units only. The server also refuses a start without `confirm: true`.
+
+### Runs and resuming
+
+There is no run ID to copy or type. A run is identified by the first 128 bits of a SHA-256 digest of a fixed domain string, the protocol version, the model set, a run number, and the API key (`hal.runs.derived_run_id`). OpenRouter keys carry 256 bits of randomness, so the digest can be neither reversed nor guessed, and the key itself is never stored.
+
+Entering the same key and choosing the same set finds that key and set's first run that is not complete. If one is unfinished (interrupted, timed out, or with provider errors to retry), starting resumes it and never repays a finished tested or judge stage. If every earlier run is complete, starting creates the next run number, so one key can keep adding runs to the leaderboard. A different set, a different key, or a new protocol version is always a different run. A rotated key cannot resume a run started with the old key; start a new one.
 
 Progress streams as NDJSON. The grid (models in the set by five scenarios) fills with outcome colors and text labels as units are judged; select a cell to read that response with its judge labels. Every call requests usage accounting and records the OpenRouter-reported cost, and all requests send `HTTP-Referer` and `X-Title`.
 
@@ -212,14 +218,14 @@ summaries/<protocol>/<run_id>.json                compact judged units for the l
 flags/<protocol>/<unit_ref>/<id>.json             one object per viewer flag
 ```
 
-Each run writes only its own objects, and each flag is its own object, so concurrent users never contend for a shared object. A per-run lease stops two requests (for example two tabs resuming one run ID) from paying for the same units twice. The process keeps an incremental in-memory aggregate: it lists `summaries/` at most every 20 seconds, re-reads only objects whose version changed, and refreshes at once when a run ends.
+Each run writes only its own objects, and each flag is its own object, so concurrent users never contend for a shared object. A per-run lease stops two requests (for example two tabs starting with the same key and set) from paying for the same units twice. The process keeps an incremental in-memory aggregate: it lists `summaries/` at most every 20 seconds, re-reads only objects whose version changed, and refreshes at once when a run ends.
 
 Two backends implement the same compare-and-swap interface (`hal/storage.py`):
 
 * The file backend (the default, and the one this deployment uses) writes under `EXPERIMENTS_DIR`, the FUSE mount at `/experiments`. Its lock is an `flock` on a file in the container's local temp directory, which is correct because only one container exists.
 * `STORAGE_BACKEND=gcs` with `GCS_BUCKET` (and optional `GCS_PREFIX`) uses the Cloud Storage API with generation preconditions and no mount. It is safe with any number of instances and is the path to take if max-instances ever rises, together with a shared rate limiter.
 
-Only server-executed, server-judged units enter the leaderboard: there is no endpoint that accepts results, and summaries are written only by the run worker that made the calls. Run IDs are unguessable resume handles and never appear in public responses; samples and flags use a one-way unit reference instead. Per-IP sliding-window limits apply to run starts (`RUN_STARTS_PER_HOUR`, default 6), flags (`FLAGS_PER_HOUR`, default 60), and key checks (`KEY_CHECKS_PER_HOUR`, default 30). They are held in process memory, which is exact because the service runs one instance with one worker. The app never stores or logs IP addresses (Cloud Run's own request logs are separate).
+Only server-executed, server-judged units enter the leaderboard: there is no endpoint that accepts results, and summaries are written only by the run worker that made the calls. Run IDs are key-derived digests that never appear in leaderboard, sample, or flag responses; those use a one-way unit reference instead. Per-IP sliding-window limits apply to run starts (`RUN_STARTS_PER_HOUR`, default 6), flags (`FLAGS_PER_HOUR`, default 60), and key checks (`KEY_CHECKS_PER_HOUR`, default 30). They are held in process memory, which is exact because the service runs one instance with one worker. The app never stores or logs IP addresses (Cloud Run's own request logs are separate).
 
 Snapshots contain model responses but never the API key; every write passes a credential-field scan, and a test runs a full mocked run with a sentinel key and proves it appears in no stored object, log line, or response.
 
@@ -274,7 +280,7 @@ gcloud run deploy hal-lab --source . --region REGION \
 
 The volume mount is required for persistence, and `--max-instances 1` is part of the storage design, not a tuning choice; see the deployment contract under Storage and abuse controls. If traffic ever needs more instances, first set `STORAGE_BACKEND=gcs` and `GCS_BUCKET=BUCKET` (the app then writes through the Cloud Storage API and ignores the mount) and move the rate limits to shared storage.
 
-Grant the service identity `roles/storage.objectAdmin` on the bucket. `--timeout 3600` is the Cloud Run maximum; a run that outlasts it can be resumed with its run ID. `--no-cpu-throttling` lets in-flight units finish and checkpoint after a browser disconnects.
+Grant the service identity `roles/storage.objectAdmin` on the bucket. `--timeout 3600` is the Cloud Run maximum; a run that outlasts it resumes when the same key and model set start again. `--no-cpu-throttling` lets in-flight units finish and checkpoint after a browser disconnects.
 
 Stored responses are model text, not personal data, but treat the bucket as you would any user-generated content: set a retention policy and limit operator access. Logs contain only run IDs, unit coordinates, and status values.
 

@@ -73,12 +73,54 @@ def unit_ref(run_id: str, model_id: str, scenario_id: str) -> str:
     return digest[:24]
 
 
-def new_run(set_name: str) -> dict:
+# Domain separation keeps these digests distinct from any other use of SHA-256.
+RUN_ID_DOMAIN = "hal-9000-contradiction-lab/run-id/v1"
+# A key and model set can accumulate many completed runs; this bounds the lookup.
+MAX_RUNS_PER_KEY_AND_SET = 1000
+
+
+def derived_run_id(api_key: str, set_name: str, run_number: int) -> str:
+    """Derive a run ID from the API key, protocol, model set, and run number.
+
+    The ID is the first 128 bits of a SHA-256 digest. OpenRouter keys carry 256
+    bits of randomness, so the digest can be neither reversed nor guessed; the key
+    itself is never stored. Including the protocol version means a new protocol
+    never resumes an old run.
+    """
+    fields = (RUN_ID_DOMAIN, PROTOCOL_VERSION, set_name, str(run_number), api_key)
+    # A unit separator cannot occur in any field, so the encoding is unambiguous.
+    return hashlib.sha256("\x1f".join(fields).encode("utf-8")).hexdigest()[:32]
+
+
+def find_run(store, api_key: str, set_name: str) -> tuple[str, int, dict | None]:
+    """Return (run_id, run_number, snapshot) for this key and set's current run.
+
+    Completed runs are skipped, so the result is either the unfinished run to
+    resume (snapshot present) or the ID for a new run (snapshot None).
+
+    Raises:
+        ValueError: If the model set is unknown.
+        RunError: If a stored snapshot is malformed or the lookup bound is reached.
+
+    """
+    model_set(set_name)
+    for run_number in range(1, MAX_RUNS_PER_KEY_AND_SET + 1):
+        run_id = derived_run_id(api_key, set_name, run_number)
+        if read_json(store, run_name(run_id)) is None:
+            return run_id, run_number, None
+        meta, _version = load_run(store, run_id)
+        if meta["status"] != "complete":
+            return run_id, run_number, meta
+    raise RunError("This key has reached the maximum number of runs for this model set.")
+
+
+def new_run(set_name: str, run_id: str | None = None, run_number: int = 1) -> dict:
     """Create a credential-free snapshot for a new run of a model set."""
     models = model_set(set_name)
     created = now_iso()
     return {
-        "run_id": uuid.uuid4().hex,
+        "run_id": run_id or uuid.uuid4().hex,
+        "run_number": run_number,
         "protocol_version": PROTOCOL_VERSION,
         "model_set": set_name,
         "model_ids": list(models),

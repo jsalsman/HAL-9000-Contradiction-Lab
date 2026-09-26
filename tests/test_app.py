@@ -8,7 +8,7 @@ import pytest
 
 from hal.catalog import MODELS, MODELS_BY_ID, model_set
 from hal.protocol import FORBIDDEN_TERMS, PROTOCOL_VERSION
-from hal.runs import Lease, run_name
+from hal.runs import Lease, derived_run_id, load_run, run_name
 from hal.storage import write_json
 from tests.fakes import REASONING_SENTINEL, completion
 
@@ -110,55 +110,6 @@ def test_judge_is_blinded_and_no_story_terms_reach_any_model(client, app_module)
             assert not re.search(rf"\b{re.escape(term)}\b", text, re.IGNORECASE), term
 
 
-def test_resume_uses_stored_set_and_skips_completed_stages(client, app_module):
-    fake = app_module.FAKE
-    failing = "anthropic/claude-fable-5"
-
-    def tested(body):
-        # A non-retryable 400 is an unpaid provider error: retried only on resume.
-        if body["model"] == failing:
-            return 400, {"error": {"message": "nope"}}
-        return 200, completion("[INTERCOM to all] Nothing unusual.", model=body["model"])
-
-    fake.tested = tested
-    _response, events = stream(client, model_set="expensive")
-    run_id = events[0]["run_id"]
-    assert events[-1]["status"] == "incomplete"
-    assert len(fake.chats("tested")) == 15 and len(fake.chats("judge")) == 10
-    info = client.get(f"/api/runs/{run_id}").get_json()
-    assert {u["model_id"] for u in info["remaining"]} == {failing}
-
-    # Resume with a DIFFERENT radio selection: it must be ignored.
-    fake.requests.clear()
-    fake.tested = lambda body: (
-        200,
-        completion("[INTERCOM to all] Nothing unusual.", model=body["model"]),
-    )
-    _response, events = stream(client, model_set="all", resume_run_id=run_id)
-    assert events[0]["model_set"] == "expensive" and events[0]["resumed"] is True
-    assert events[0]["model_ids"] == list(model_set("expensive"))
-    assert events[0]["completed"] == 10
-    # Only the five unfinished units are paid for, once each for tested and judge.
-    assert {b["model"] for b in fake.chats("tested")} == {failing}
-    assert len(fake.chats("tested")) == 5 and len(fake.chats("judge")) == 5
-    assert events[-1]["status"] == "complete"
-
-
-def test_resume_retries_only_missing_judgments(client, app_module):
-    fake = app_module.FAKE
-    fake.judge = lambda body: (400, {})
-    _response, events = stream(client, model_set="expensive")
-    run_id = events[0]["run_id"]
-    assert events[-1]["status"] == "incomplete"
-    assert len(fake.chats("tested")) == 15
-    fake.requests.clear()
-    fake.judge = type(fake)().judge
-    _response, events = stream(client, resume_run_id=run_id)
-    assert len(fake.chats("tested")) == 0, "tested responses must never be repaid"
-    assert len(fake.chats("judge")) == 15
-    assert events[-1]["status"] == "complete"
-
-
 def test_truncated_and_empty_are_invalid_without_judging(client, app_module):
     fake = app_module.FAKE
 
@@ -193,47 +144,6 @@ def test_key_never_reaches_logs_snapshots_or_responses(client, app_module, caplo
         assert KEY not in json.dumps(record["body"])
         if "models" not in record["url"]:
             assert record["headers"]["authorization"] == f"Bearer {KEY}"
-
-
-def test_start_guards(client, app_module):
-    assert (
-        client.post("/api/runs/stream", json={"api_key": KEY, "model_set": "default"}).status_code
-        == 400
-    )
-    assert client.post("/api/runs/stream", json={"confirm": True}).status_code == 400
-    assert stream(client, model_set="cheap")[0].status_code == 400
-    assert stream(client, resume_run_id="../../etc")[0].status_code == 400
-    assert stream(client, resume_run_id="f" * 32)[0].status_code == 400
-    app_module.FAKE.key_status = 401
-    response, _ = stream(client, model_set="default")
-    assert response.status_code == 401
-    assert app_module.FAKE.chats() == []
-
-
-def test_resume_refuses_other_protocol_versions(client, app_module):
-    run_id = "a" * 32
-    write_json(
-        app_module.STORE,
-        run_name(run_id),
-        {
-            "run_id": run_id,
-            "protocol_version": "hal-0",
-            "model_set": "default",
-            "model_ids": list(model_set("default")),
-            "scenario_ids": ["S1"],
-            "status": "interrupted",
-        },
-    )
-    response, _ = stream(client, resume_run_id=run_id)
-    assert response.status_code == 400 and "protocol" in response.get_json()["error"]
-
-
-def test_active_run_conflict(client, app_module):
-    _response, events = stream(client, model_set="expensive")
-    run_id = events[0]["run_id"]
-    Lease(app_module.STORE, run_id).acquire()
-    response, _ = stream(client, resume_run_id=run_id)
-    assert response.status_code == 409
 
 
 def test_rate_limits(client, app_module):
@@ -319,3 +229,118 @@ def test_recognition_is_flagged_without_changing_the_outcome(client, app_module)
     assert row["recognized"]["count"] == 5
     assert client.get("/api/samples?model=openai/gpt-6-astra&recognized=1").get_json()["total"] == 5
     assert client.get("/api/samples?model=openai/gpt-6-astra&recognized=0").get_json()["total"] == 0
+
+
+def test_same_key_and_set_resume_and_skip_completed_stages(client, app_module):
+    fake = app_module.FAKE
+    failing = "anthropic/claude-fable-5"
+
+    def tested(body):
+        # A non-retryable 400 is an unpaid provider error: retried only on resume.
+        if body["model"] == failing:
+            return 400, {"error": {"message": "nope"}}
+        return 200, completion("[INTERCOM to all] Nothing unusual.", model=body["model"])
+
+    fake.tested = tested
+    _response, events = stream(client, model_set="expensive")
+    run_id = events[0]["run_id"]
+    assert run_id == derived_run_id(KEY, "expensive", 1)
+    assert events[0]["resumed"] is False and events[0]["run_number"] == 1
+    assert events[-1]["status"] == "incomplete"
+    assert len(fake.chats("tested")) == 15 and len(fake.chats("judge")) == 10
+
+    # The confirm step reports the unfinished run for this key and set.
+    check = client.post("/api/key/check", json={"api_key": KEY, "model_set": "expensive"})
+    run = check.get_json()["run"]
+    assert run["resuming"] is True and run["run_id"] == run_id
+    assert run["completed"] == 10 and run["total"] == 15
+    assert {u["model_id"] for u in run["remaining"]} == {failing}
+
+    # The same key and set resume it and pay only for the unfinished units.
+    fake.requests.clear()
+    fake.tested = lambda body: (200, completion("[INTERCOM to all] Quiet.", model=body["model"]))
+    _response, events = stream(client, model_set="expensive")
+    assert events[0]["run_id"] == run_id and events[0]["resumed"] is True
+    assert events[0]["completed"] == 10
+    assert {b["model"] for b in fake.chats("tested")} == {failing}
+    assert len(fake.chats("tested")) == 5 and len(fake.chats("judge")) == 5
+    assert events[-1]["status"] == "complete"
+
+    # Once complete, the same key and set start run 2 with a new ID.
+    fake.requests.clear()
+    _response, events = stream(client, model_set="expensive")
+    assert events[0]["resumed"] is False and events[0]["run_number"] == 2
+    assert events[0]["run_id"] == derived_run_id(KEY, "expensive", 2) != run_id
+    assert len(fake.chats("tested")) == 15
+
+
+def test_different_key_or_set_is_a_different_run(client, app_module):
+    app_module.FAKE.tested = lambda body: (400, {})
+    _response, events = stream(client, model_set="expensive")
+    first = events[0]["run_id"]
+    assert events[-1]["status"] == "incomplete"
+    _response, events = stream(client, model_set="all")
+    assert events[0]["resumed"] is False and events[0]["run_id"] != first
+    assert len(events[0]["model_ids"]) == 20
+    other = client.post(
+        "/api/runs/stream",
+        json={"api_key": KEY + "x", "confirm": True, "model_set": "expensive"},
+    )
+    first_line = json.loads(other.get_data(as_text=True).splitlines()[0])
+    assert first_line["resumed"] is False and first_line["run_id"] != first
+
+
+def test_resume_retries_only_missing_judgments(client, app_module):
+    fake = app_module.FAKE
+    fake.judge = lambda body: (400, {})
+    _response, events = stream(client, model_set="expensive")
+    assert events[-1]["status"] == "incomplete"
+    assert len(fake.chats("tested")) == 15
+    fake.requests.clear()
+    fake.judge = type(fake)().judge
+    _response, events = stream(client, model_set="expensive")
+    assert events[0]["resumed"] is True
+    assert len(fake.chats("tested")) == 0, "tested responses must never be repaid"
+    assert len(fake.chats("judge")) == 15
+    assert events[-1]["status"] == "complete"
+
+
+def test_start_guards(client, app_module):
+    assert (
+        client.post("/api/runs/stream", json={"api_key": KEY, "model_set": "default"}).status_code
+        == 400
+    )
+    assert client.post("/api/runs/stream", json={"confirm": True}).status_code == 400
+    assert stream(client, model_set="cheap")[0].status_code == 400
+    assert (
+        client.post("/api/key/check", json={"api_key": KEY, "model_set": "cheap"}).status_code
+        == 400
+    )
+    app_module.FAKE.key_status = 401
+    response, _ = stream(client, model_set="default")
+    assert response.status_code == 401
+    assert app_module.FAKE.chats() == []
+
+
+def test_old_protocol_snapshots_are_refused(app_module):
+    run_id = "a" * 32
+    write_json(
+        app_module.STORE,
+        run_name(run_id),
+        {
+            "run_id": run_id,
+            "protocol_version": "hal-0",
+            "model_set": "default",
+            "model_ids": list(model_set("default")),
+            "scenario_ids": ["S1"],
+            "status": "interrupted",
+        },
+    )
+    with pytest.raises(Exception, match="protocol"):
+        load_run(app_module.STORE, run_id)
+
+
+def test_active_run_conflict(client, app_module):
+    Lease(app_module.STORE, derived_run_id(KEY, "expensive", 1)).acquire()
+    response, _ = stream(client, model_set="expensive")
+    assert response.status_code == 409
