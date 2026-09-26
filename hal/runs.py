@@ -210,7 +210,13 @@ def run_status(meta: dict, units: dict) -> str:
 
 
 class Lease:
-    """A compare-and-swap lease giving one request exclusive use of a run."""
+    """A compare-and-swap lease giving one request exclusive use of a run.
+
+    Under the max-instances=1 deployment the lease stops two requests in the same
+    container (for example two browser tabs resuming one run ID) from paying for
+    the same units twice. The same code is also correct across instances when the
+    Cloud Storage API backend is used.
+    """
 
     def __init__(self, store, run_id: str, seconds: int = LEASE_SECONDS) -> None:
         """Bind a lease object to a run; call :meth:`acquire` before use."""

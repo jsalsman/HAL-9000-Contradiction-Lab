@@ -40,7 +40,8 @@ RUN set -eu; \
     python -c "import json, urllib.request; base='http://127.0.0.1:8080'; health=json.load(urllib.request.urlopen(base + '/api/healthz', timeout=5)); assert health == {'status': 'ok'}; page=urllib.request.urlopen(base + '/', timeout=5).read().decode(); assert 'Jim Salsman' in page and 'HAL 9000 Contradiction Lab' in page; catalog=json.load(urllib.request.urlopen(base + '/api/catalog', timeout=5)); assert len(catalog['models']) == 20"
 
 EXPOSE 8080
-# gthread overlaps provider and storage waits; each streamed run holds one thread, so
-# THREADS bounds concurrent runs per instance. Keep WORKERS at 1 with the file store.
-# exec preserves signal forwarding.
+# Deploy with Cloud Run --max-instances 1 and keep WORKERS at 1: the app is then the
+# only writer to the FUSE-mounted /experiments store (see hal/storage.py). gthread
+# overlaps provider and storage waits; each streamed run holds one thread, so THREADS
+# bounds concurrent runs. exec preserves signal forwarding.
 CMD exec gunicorn --bind "0.0.0.0:${PORT:-8080}" --worker-class gthread --workers "${WORKERS:-1}" --threads "${THREADS:-8}" --timeout 270 --graceful-timeout 30 flask-app:app

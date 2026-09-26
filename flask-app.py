@@ -35,7 +35,7 @@ from hal.runs import (
     unit_view,
     write_summary,
 )
-from hal.storage import StorageError, make_store
+from hal.storage import StorageError, make_store, storage_problem
 
 # Logs carry run IDs and statuses only: never keys, headers, prompts, or responses.
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
@@ -49,12 +49,18 @@ app.config.update(MAX_CONTENT_LENGTH=16 * 1024)
 # Cloud Run's front end appends the real client address as the last X-Forwarded-For hop.
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 
-# One store and leaderboard cache per process; tests replace these attributes.
+# Deployment contract: Cloud Run max-instances=1 and one Gunicorn worker, so this
+# process is the only writer to the FUSE-mounted store and holds the only
+# leaderboard cache and rate-limit state (see hal/storage.py). Tests replace these.
 STORE = make_store()
 LEADERBOARD = Leaderboard(STORE)
+# Cloud Run disk is ephemeral: without the bucket mount, paid runs and flags are refused.
+STORAGE_PROBLEM = storage_problem(STORE)
+if STORAGE_PROBLEM:
+    LOG.error("storage: %s", STORAGE_PROBLEM)
 # Tests inject an httpx.MockTransport here so no request leaves the process.
 HTTP_TRANSPORT: httpx.AsyncBaseTransport | None = None
-# Per-IP limits on paid run starts and on flags (per instance; see README).
+# Per-IP limits on paid run starts, flags, and key checks; exact at max-instances=1.
 RUN_LIMITER = RateLimiter(int(os.environ.get("RUN_STARTS_PER_HOUR", "6")), 3600)
 FLAG_LIMITER = RateLimiter(int(os.environ.get("FLAGS_PER_HOUR", "60")), 3600)
 KEY_LIMITER = RateLimiter(int(os.environ.get("KEY_CHECKS_PER_HOUR", "30")), 3600)
@@ -187,6 +193,9 @@ def run_stream():
     request is ignored. The key is validated before any paid call.
     """
     lease = None
+    if STORAGE_PROBLEM:
+        # Never take payment for work that would be lost with the instance.
+        return jsonify(error=STORAGE_PROBLEM), 503
     try:
         data = _payload()
         api_key = _key(data)
@@ -424,6 +433,8 @@ def flag():
             raise ValueError("Invalid unit reference.")
     except ValueError as exc:
         return jsonify(error=str(exc)), 400
+    if STORAGE_PROBLEM:
+        return jsonify(error=STORAGE_PROBLEM), 503
     if not FLAG_LIMITER.allow(_address()):
         return jsonify(error="Too many flags from this address. Try later."), 429
     try:

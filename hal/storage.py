@@ -1,5 +1,14 @@
 """Small object-store abstraction with compare-and-swap writes.
 
+Deployment contract: the Cloud Run service runs with max-instances=1 and one
+Gunicorn worker, with the bucket mounted by Cloud Storage FUSE at
+``EXPERIMENTS_DIR`` (``/experiments``). Exactly one process therefore reads and
+writes the mount, and every read, write, list, and delete goes through one
+in-process lock plus a local ``flock``. There is no second writer, so the
+non-atomic rename and eventual listing behavior of FUSE, and any mix of FUSE and
+Cloud Storage API access, cannot race. Do not raise max-instances without first
+switching to ``STORAGE_BACKEND=gcs``.
+
 Two backends share one interface:
 
 * :class:`LocalStore` keeps files under ``EXPERIMENTS_DIR``. Its compare-and-swap
@@ -99,7 +108,11 @@ def write_json(store: ObjectStore, name: str, value: Any, *, if_version: Any = A
 
 
 class LocalStore:
-    """Filesystem backend. Safe across processes on one machine only."""
+    """Filesystem backend for the max-instances=1 deployment on a FUSE mount.
+
+    Safe for any number of threads and processes inside one container, and only
+    there: it is the sole writer only because Cloud Run runs one instance.
+    """
 
     def __init__(self, root: Path) -> None:
         """Bind the store to a root directory, creating it if needed."""
@@ -271,6 +284,49 @@ class GCSStore:
             if _named(exc, "PreconditionFailed"):
                 raise VersionConflict(name) from None
             raise StorageError("Cloud Storage delete failed.") from exc
+
+
+# Linux mountinfo escapes spaces and similar characters as three-digit octal.
+_MOUNT_ESCAPE = re.compile(r"\\([0-7]{3})")
+
+
+def is_gcsfuse_mount(directory: Path, mountinfo: Path = Path("/proc/self/mountinfo")) -> bool:
+    """Return whether a directory is inside a Cloud Storage FUSE mount.
+
+    Cloud Run container disk is in-memory and lost when the instance stops, so the
+    file store is persistent only on a ``fuse.gcsfuse`` mount.
+    """
+    target = Path(directory).resolve()
+    try:
+        lines = mountinfo.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return False
+    for line in lines:
+        # Field five is the mount point; the filesystem type follows " - ".
+        if " - " not in line:
+            continue
+        left, right = line.split(" - ", 1)
+        fields, kinds = left.split(), right.split()
+        if len(fields) < 5 or not kinds or kinds[0] != "fuse.gcsfuse":
+            continue
+        point = Path(_MOUNT_ESCAPE.sub(lambda m: chr(int(m.group(1), 8)), fields[4]))
+        if target == point or point in target.parents:
+            return True
+    return False
+
+
+def storage_problem(store: ObjectStore) -> str | None:
+    """Return why runs must not start with this store, or None when it is persistent.
+
+    On Cloud Run (``K_SERVICE`` is set) the file store must sit on the Cloud Storage
+    FUSE mount; otherwise every run and flag would vanish with the instance.
+    Outside Cloud Run (local development, tests) any directory is accepted.
+    """
+    if not isinstance(store, LocalStore) or not os.environ.get("K_SERVICE"):
+        return None
+    if is_gcsfuse_mount(store.root):
+        return None
+    return "Run storage is not persistent: mount the Cloud Storage bucket at EXPERIMENTS_DIR."
 
 
 def make_store() -> ObjectStore:

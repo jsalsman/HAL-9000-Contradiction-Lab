@@ -1,9 +1,19 @@
 """Object stores, credential scan, and leases."""
 
+from pathlib import Path
+
 import pytest
 
 from hal.runs import Lease, RunActiveError
-from hal.storage import GCSStore, StorageError, VersionConflict, read_json, write_json
+from hal.storage import (
+    GCSStore,
+    StorageError,
+    VersionConflict,
+    is_gcsfuse_mount,
+    read_json,
+    storage_problem,
+    write_json,
+)
 from tests.fakes import FakeBucket
 
 
@@ -53,3 +63,25 @@ def test_lease_excludes_second_owner_and_allows_takeover_after_expiry(any_store)
     successor.heartbeat()
     first.release()
     Lease(any_store, "a" * 32).acquire()
+
+
+def test_gcsfuse_mount_detection(tmp_path):
+    mountinfo = tmp_path / "mountinfo"
+    mountinfo.write_text(
+        "36 35 98:0 / / rw - overlay overlay rw\n"
+        "50 36 0:45 / /experiments rw,nosuid - fuse.gcsfuse my-bucket rw\n"
+        "51 36 0:46 / /other rw - tmpfs tmpfs rw\n"
+    )
+    assert is_gcsfuse_mount(Path("/experiments"), mountinfo)
+    assert is_gcsfuse_mount(Path("/experiments/runs"), mountinfo)
+    assert not is_gcsfuse_mount(Path("/experiments-old"), mountinfo)
+    assert not is_gcsfuse_mount(Path("/other"), mountinfo)
+    assert not is_gcsfuse_mount(Path("/experiments"), tmp_path / "missing")
+
+
+def test_storage_problem_only_on_cloud_run_without_mount(store, monkeypatch):
+    monkeypatch.delenv("K_SERVICE", raising=False)
+    assert storage_problem(store) is None
+    monkeypatch.setenv("K_SERVICE", "hal-lab")
+    assert "not persistent" in storage_problem(store)
+    assert storage_problem(GCSStore(FakeBucket())) is None

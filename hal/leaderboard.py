@@ -2,8 +2,10 @@
 
 Every final, server-judged unit from every run counts, whatever model set the run
 used. Summaries are one object per run, so concurrent runs never contend for a
-shared object. Each instance keeps an incremental in-memory cache: a listing
-finds changed summaries by version and only those are re-read.
+shared object. The process keeps an incremental in-memory cache: a listing
+finds changed summaries by version and only those are re-read. Under the
+max-instances=1 deployment this is the only cache, and the process invalidates it
+itself when a run ends, so the leaderboard never lags a local write.
 """
 
 import random

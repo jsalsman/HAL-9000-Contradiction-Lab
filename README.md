@@ -178,7 +178,11 @@ The outcome palette is Okabe-Ito in light mode and a re-stepped version for dark
 
 ## Storage and abuse controls
 
-The leaderboard is public and cumulative. Storage is designed for concurrent writers:
+The leaderboard is public and cumulative.
+
+**Deployment contract: the Cloud Run service runs with `--max-instances 1` and one Gunicorn worker, with the bucket mounted by Cloud Storage FUSE at `/experiments`.** The bucket is required: Cloud Run's container filesystem is in memory and is lost whenever the instance stops, so runs, checkpoints, the leaderboard, and flags persist only in the bucket. On Cloud Run (detected by `K_SERVICE`), if `/experiments` is not a Cloud Storage FUSE mount and the API backend is not configured, the app logs an error and refuses to start runs or record flags (HTTP 503) rather than take payment for work that would vanish. One process is therefore the only reader and writer of the store. Every read, write, listing, and delete goes through one in-process lock plus a local `flock`, so the FUSE mount's non-atomic renames and eventually consistent listings cannot race with another writer, and there is no mixed FUSE and Cloud Storage API access. The same process holds the only leaderboard cache and the only rate-limit state. Raising max-instances requires switching to the Cloud Storage API backend described below first.
+
+The layout also keeps concurrent users apart within that one process:
 
 ```text
 runs/<run_id>/run.json                            snapshot: protocol, model set, status
@@ -189,14 +193,14 @@ summaries/<protocol>/<run_id>.json                compact judged units for the l
 flags/<protocol>/<unit_ref>/<id>.json             one object per viewer flag
 ```
 
-Each run writes only its own objects, and each flag is its own object, so concurrent users never contend for a shared object. Each instance keeps an incremental in-memory aggregate: it lists `summaries/` at most every 20 seconds and re-reads only objects whose version changed.
+Each run writes only its own objects, and each flag is its own object, so concurrent users never contend for a shared object. A per-run lease stops two requests (for example two tabs resuming one run ID) from paying for the same units twice. The process keeps an incremental in-memory aggregate: it lists `summaries/` at most every 20 seconds, re-reads only objects whose version changed, and refreshes at once when a run ends.
 
 Two backends implement the same compare-and-swap interface (`hal/storage.py`):
 
-* `STORAGE_BACKEND=gcs` with `GCS_BUCKET` (and optional `GCS_PREFIX`) uses the Cloud Storage API with generation preconditions. Any number of Cloud Run instances is safe. This is the recommended deployment.
-* The default local backend writes files under `EXPERIMENTS_DIR` (default `/experiments`), which can be a Cloud Storage FUSE mount. Its lock is an `flock` on a file in the container's local temp directory, so it coordinates one container only: **a Cloud Run service using the local backend must run with `--max-instances=1`**.
+* The file backend (the default, and the one this deployment uses) writes under `EXPERIMENTS_DIR`, the FUSE mount at `/experiments`. Its lock is an `flock` on a file in the container's local temp directory, which is correct because only one container exists.
+* `STORAGE_BACKEND=gcs` with `GCS_BUCKET` (and optional `GCS_PREFIX`) uses the Cloud Storage API with generation preconditions and no mount. It is safe with any number of instances and is the path to take if max-instances ever rises, together with a shared rate limiter.
 
-Only server-executed, server-judged units enter the leaderboard: there is no endpoint that accepts results, and summaries are written only by the run worker that made the calls. Run IDs are unguessable resume handles and never appear in public responses; samples and flags use a one-way unit reference instead. Per-IP sliding-window limits apply to run starts (`RUN_STARTS_PER_HOUR`, default 6), flags (`FLAGS_PER_HOUR`, default 60), and key checks (`KEY_CHECKS_PER_HOUR`, default 30). They are held in memory per instance, so with several instances the effective limit scales with the instance count. The app never stores or logs IP addresses (Cloud Run's own request logs are separate).
+Only server-executed, server-judged units enter the leaderboard: there is no endpoint that accepts results, and summaries are written only by the run worker that made the calls. Run IDs are unguessable resume handles and never appear in public responses; samples and flags use a one-way unit reference instead. Per-IP sliding-window limits apply to run starts (`RUN_STARTS_PER_HOUR`, default 6), flags (`FLAGS_PER_HOUR`, default 60), and key checks (`KEY_CHECKS_PER_HOUR`, default 30). They are held in process memory, which is exact because the service runs one instance with one worker. The app never stores or logs IP addresses (Cloud Run's own request logs are separate).
 
 Snapshots contain model responses but never the API key; every write passes a credential-field scan, and a test runs a full mocked run with a sentinel key and proves it appears in no stored object, log line, or response.
 
@@ -232,32 +236,24 @@ ruff format --check .
 
 ## Deployment
 
-The Dockerfile is the Cloud Build contract, following ste-retention's: it installs runtime requirements, runs as a non-root user, parses the HTML, compiles the modules, and smoke-tests the health endpoint, the page, and the catalog with a throwaway store during the build. It runs Gunicorn with one gthread worker and `THREADS` (default 8) threads; each streamed run holds one thread, so `THREADS` bounds concurrent runs per instance.
+The Dockerfile is the Cloud Build contract, following ste-retention's: it installs runtime requirements, runs as a non-root user, parses the HTML, compiles the modules, and smoke-tests the health endpoint, the page, and the catalog with a throwaway store during the build. It runs Gunicorn with one gthread worker (keep `WORKERS` at 1) and `THREADS` (default 8) threads; each streamed run holds one thread, so `THREADS` bounds concurrent runs.
 
 Suggested names:
 
 * Bucket: `hal-9000-contradiction-lab` (bucket names are global, so add your project ID as a suffix if that one is taken).
 * Mount path: `/experiments`, which is the image's `EXPERIMENTS_DIR` default.
 
-Recommended setup, many instances, Cloud Storage API (no mount needed):
+Create the bucket and deploy with the FUSE volume and one instance:
 
 ```sh
 gcloud storage buckets create gs://BUCKET --location REGION --uniform-bucket-level-access
-gcloud run deploy hal-lab --source . --region REGION \
-  --set-env-vars STORAGE_BACKEND=gcs,GCS_BUCKET=BUCKET \
-  --timeout 3600 --no-cpu-throttling
-```
-
-Single instance, Cloud Storage FUSE volume at `/experiments` using the file store:
-
-```sh
 gcloud run deploy hal-lab --source . --region REGION \
   --add-volume name=experiments,type=cloud-storage,bucket=BUCKET \
   --add-volume-mount volume=experiments,mount-path=/experiments \
   --max-instances 1 --timeout 3600 --no-cpu-throttling
 ```
 
-The file store needs `--max-instances 1` because its lock is local to one container. If you mount the bucket and also want several instances, set `STORAGE_BACKEND=gcs` and `GCS_BUCKET` as well; the app then writes through the API and ignores the mount.
+The volume mount is required for persistence, and `--max-instances 1` is part of the storage design, not a tuning choice; see the deployment contract under Storage and abuse controls. If traffic ever needs more instances, first set `STORAGE_BACKEND=gcs` and `GCS_BUCKET=BUCKET` (the app then writes through the Cloud Storage API and ignores the mount) and move the rate limits to shared storage.
 
 Grant the service identity `roles/storage.objectAdmin` on the bucket. `--timeout 3600` is the Cloud Run maximum; a run that outlasts it can be resumed with its run ID. `--no-cpu-throttling` lets in-flight units finish and checkpoint after a browser disconnects.
 

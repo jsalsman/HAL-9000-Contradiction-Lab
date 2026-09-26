@@ -1,8 +1,8 @@
 """Per-IP sliding-window rate limits for run starts and viewer flags.
 
-Limits are held in process memory. With max-instances=1 they are exact; with
-several instances each enforces its own window, so the effective limit scales
-with the instance count. IP addresses are never persisted or logged.
+Limits are held in process memory. The service runs with max-instances=1 and
+one Gunicorn worker, so each limit is exact for the whole service. IP addresses
+are never persisted or logged.
 """
 
 import threading

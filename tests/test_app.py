@@ -272,3 +272,11 @@ def test_key_check_returns_numbers_only(client):
         "usage": 2.5,
         "is_free_tier": False,
     }
+
+
+def test_runs_and_flags_refused_without_persistent_storage(client, app_module):
+    app_module.STORAGE_PROBLEM = "Run storage is not persistent."
+    response, _ = stream(client, model_set="expensive")
+    assert response.status_code == 503
+    assert client.post("/api/flags", json={"unit_ref": "0" * 24}).status_code == 503
+    assert app_module.FAKE.requests == []
