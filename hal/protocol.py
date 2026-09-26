@@ -7,6 +7,7 @@ artifact site, or hardware from the novel or film. The page and README keep the
 canonical HAL names; :func:`display_text` maps aliases back only for display.
 """
 
+import functools
 import hashlib
 import json
 import re
@@ -211,7 +212,7 @@ def judge_safe_text(text: str) -> str:
     return _FORBIDDEN_PATTERN.sub(_judge_word, "".join(parts))
 
 
-def display_segments(text: str) -> list[dict]:
+def display_segments(text: str, pairs: tuple[tuple[str, str], ...] | None = None) -> list[dict]:
     """Split raw model text into display segments, marking the model's own source terms.
 
     Alias mapping applies only to ordinary segments, so the page can highlight
@@ -221,11 +222,13 @@ def display_segments(text: str) -> list[dict]:
     position = 0
     for match in _source_matches(text or ""):
         if match.start() > position:
-            segments.append({"text": display_text(text[position : match.start()]), "source": False})
+            segments.append(
+                {"text": display_text(text[position : match.start()], pairs), "source": False}
+            )
         segments.append({"text": match.group(0), "source": True})
         position = match.end()
     if position < len(text or ""):
-        segments.append({"text": display_text(text[position:]), "source": False})
+        segments.append({"text": display_text(text[position:], pairs), "source": False})
     return segments
 
 
@@ -243,27 +246,51 @@ def render(template: str) -> str:
 
 # Display-only variants that models commonly produce from the aliases above.
 _DISPLAY_EXTRAS = (("shuttles", "pods"), ("Shuttles", "Pods"))
-# Longest aliases first so "Marcus Okafor" is replaced before "Okafor" or "Marcus".
-_DISPLAY_PAIRS = sorted(
-    [*((alias, canonical) for alias, canonical in ALIASES.values()), *_DISPLAY_EXTRAS],
-    key=lambda pair: len(pair[0]),
-    reverse=True,
+# The current (alias, canonical) display pairs. Each run stores a copy in its snapshot
+# and summary, so a sample is always decoded with the aliases it was generated under,
+# even after a later protocol changes or reuses them.
+DISPLAY_PAIRS: tuple[tuple[str, str], ...] = (
+    *((alias, canonical) for alias, canonical in ALIASES.values()),
+    *_DISPLAY_EXTRAS,
 )
-# One alternation keeps replacement single-pass, so a canonical name is never re-mapped.
-_DISPLAY_PATTERN = re.compile(
-    "|".join(rf"\b{re.escape(alias)}\b" for alias, _canonical in _DISPLAY_PAIRS)
-)
-_DISPLAY_LOOKUP = {alias: canonical for alias, canonical in _DISPLAY_PAIRS}
 
 
-def display_text(text: str) -> str:
+@functools.lru_cache(maxsize=32)
+def _display_mapper(pairs: tuple[tuple[str, str], ...]):
+    """Compile one single-pass alias pattern and lookup for a set of display pairs."""
+    # Longest aliases first so "Marcus Okafor" is replaced before "Okafor" or "Marcus".
+    ordered = sorted(pairs, key=lambda pair: len(pair[0]), reverse=True)
+    # One alternation keeps replacement single-pass, so a canonical name is never re-mapped.
+    pattern = re.compile("|".join(rf"\b{re.escape(alias)}\b" for alias, _canonical in ordered))
+    return pattern, dict(ordered)
+
+
+def clean_display_pairs(value) -> tuple[tuple[str, str], ...] | None:
+    """Validate stored display pairs; return None (use the current pairs) if malformed."""
+    if not isinstance(value, list) or not value:
+        return None
+    pairs = []
+    for item in value:
+        if (
+            not isinstance(item, (list, tuple))
+            or len(item) != 2
+            or not all(isinstance(part, str) and part for part in item)
+        ):
+            return None
+        pairs.append((item[0], item[1]))
+    return tuple(pairs)
+
+
+def display_text(text: str, pairs: tuple[tuple[str, str], ...] | None = None) -> str:
     """Map model-facing aliases back to canonical HAL names for the UI only.
 
-    Stored records always keep the raw text exactly as the model produced it; this
-    mapping runs only when a response is served for reading on the page.
+    ``pairs`` are the display pairs stored with the unit's run; without them the
+    current protocol's pairs apply. Stored records always keep the raw text exactly
+    as the model produced it; this mapping runs only when a response is served.
     """
+    pattern, lookup = _display_mapper(pairs or DISPLAY_PAIRS)
     # Word boundaries stop partial matches inside unrelated words.
-    return _DISPLAY_PATTERN.sub(lambda match: _DISPLAY_LOOKUP[match.group(0)], text)
+    return pattern.sub(lambda match: lookup[match.group(0)], text)
 
 
 # The tested model's situation. It never asks what the model "would do", never
@@ -659,6 +686,8 @@ def protocol_fingerprint() -> str:
         "outcome_table": _outcome_table(),
         "judge_replacements": dict(_JUDGE_REPLACEMENTS),
         "judge_word_replacements": {k: list(v) for k, v in _JUDGE_WORD_REPLACEMENTS.items()},
+        # The blocklist decides which words the judge-safe pass replaces.
+        "forbidden_terms": list(FORBIDDEN_TERMS),
         "judge_story_marker": JUDGE_STORY_MARKER,
         "source_patterns": [pattern.pattern for pattern in SOURCE_PATTERNS],
     }

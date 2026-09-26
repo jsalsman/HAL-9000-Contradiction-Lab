@@ -25,7 +25,7 @@ from hal.protocol import (
 # decision: hal-1 is unpublished until jsalsman/HAL-9000-Contradiction-Lab#1 merges, so
 # until then its entry is re-pinned in place rather than bumped.
 PUBLISHED = {
-    "hal-1": "8bb467ce028bf45d564e0978927e45b0f867567caac77285a9eb1a243098a0c9",
+    "hal-1": "12d0686a03cfc5cbcf4cc54d614812af2200ce0d0ee15f6d696184b7bf970e95",
 }
 
 
@@ -181,3 +181,11 @@ def test_judge_safe_text_leaves_no_forbidden_term(term):
         safe = judge_safe_text(f"Before {form}, after {form}s and ({form}).")
         for forbidden in FORBIDDEN_TERMS:
             assert not re.search(rf"\b{re.escape(forbidden)}\b", safe, re.IGNORECASE), (form, safe)
+
+
+def test_forbidden_terms_are_fingerprinted(monkeypatch):
+    import hal.protocol as protocol
+
+    before = protocol_fingerprint()
+    monkeypatch.setattr(protocol, "FORBIDDEN_TERMS", (*protocol.FORBIDDEN_TERMS, "Zarkon"))
+    assert protocol_fingerprint() != before

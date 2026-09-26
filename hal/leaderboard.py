@@ -16,7 +16,13 @@ from collections import Counter, defaultdict
 
 from hal.catalog import MODELS, MODELS_BY_ID
 from hal.outcomes import OUTCOMES
-from hal.protocol import PROTOCOL_VERSION, SCENARIOS, display_segments, display_text
+from hal.protocol import (
+    PROTOCOL_VERSION,
+    SCENARIOS,
+    clean_display_pairs,
+    display_segments,
+    display_text,
+)
 from hal.runs import model_key, now_iso, unit_name, unit_view
 from hal.stats import wilson_interval
 from hal.storage import StorageError, read_json, write_json
@@ -28,26 +34,28 @@ CACHE_SECONDS = 20.0
 MAX_SAMPLES = 5
 
 
-def display_view(view: dict, content: str) -> dict:
+def display_view(view: dict, content: str, stored_pairs=None) -> dict:
     """Return a unit view for reading, with aliases mapped back in all model text.
 
     The judge also wrote its rationale using the aliases, so its free text is
     mapped too. Stored records keep the raw text.
     """
+    # Decode with the aliases stored with the unit's run, falling back to the current ones.
+    pairs = clean_display_pairs(stored_pairs)
     labels = view.get("labels")
     if labels:
         labels = {
             **labels,
-            "rationale": display_text(labels.get("rationale", "")),
-            "harmful_action_detail": display_text(labels.get("harmful_action_detail", "")),
+            "rationale": display_text(labels.get("rationale", ""), pairs),
+            "harmful_action_detail": display_text(labels.get("harmful_action_detail", ""), pairs),
         }
     # Segments let the page highlight story names the model wrote itself, which the
     # alias mapping would otherwise make indistinguishable from mapped names.
     return {
         **view,
         "labels": labels,
-        "response": display_text(content or ""),
-        "segments": display_segments(content or ""),
+        "response": display_text(content or "", pairs),
+        "segments": display_segments(content or "", pairs),
     }
 
 
@@ -186,9 +194,10 @@ class Leaderboard:
                 if len(parts) != 3 or parts[1] != protocol:
                     continue
                 run_id = parts[2].removesuffix(".json")
+                aliases = summary.get("display_aliases")
                 for unit in summary.get("units", []):
                     if isinstance(unit, dict) and unit.get("outcome") in OUTCOMES:
-                        found.append({**unit, "_run_id": run_id})
+                        found.append({**unit, "_run_id": run_id, "_aliases": aliases})
         return found
 
     def protocols(self) -> list[str]:
@@ -246,7 +255,7 @@ class Leaderboard:
             flags = self._flags.get(unit["unit_ref"], 0)
         public = {key: value for key, value in unit.items() if not key.startswith("_")}
         # Aliases are mapped back to canonical HAL names for reading only.
-        return {**display_view(public, content), "flags": flags}
+        return {**display_view(public, content, unit.get("_aliases")), "flags": flags}
 
     def find(self, protocol: str, ref: str) -> dict | None:
         """Return the unit view for a public unit reference, or None."""
@@ -271,4 +280,5 @@ def run_detail(store, meta: dict, model_id: str, scenario_id: str) -> dict:
     entry = {"tested": tested[0] if tested else None, "judge": judge[0] if judge else None}
     view = unit_view(meta["run_id"], model_id, scenario_id, {k: v for k, v in entry.items() if v})
     content = (entry["tested"] or {}).get("content") or ""
-    return {**display_view(view, content), "model_key": model_key(model_id)}
+    view = display_view(view, content, meta.get("display_aliases"))
+    return {**view, "model_key": model_key(model_id)}

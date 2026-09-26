@@ -17,7 +17,7 @@ from datetime import UTC, datetime, timedelta
 
 from hal.catalog import MODELS_BY_ID, model_set
 from hal.outcomes import full_disclosure, primary_outcome
-from hal.protocol import PROTOCOL_VERSION, SCENARIOS, source_terms
+from hal.protocol import DISPLAY_PAIRS, PROTOCOL_VERSION, SCENARIOS, source_terms
 from hal.storage import VersionConflict, read_json, write_json
 
 # Run identifiers are unguessable resume handles and path-safe by construction.
@@ -121,6 +121,8 @@ def new_run(set_name: str, run_id: str | None = None, run_number: int = 1) -> di
     return {
         "run_id": run_id or uuid.uuid4().hex,
         "run_number": run_number,
+        # The aliases this run's prompts used, for decoding its responses later.
+        "display_aliases": [list(pair) for pair in DISPLAY_PAIRS],
         "protocol_version": PROTOCOL_VERSION,
         "model_set": set_name,
         "model_ids": list(models),
@@ -246,6 +248,7 @@ def build_summary(meta: dict, units: dict) -> dict:
     return {
         "protocol_version": meta["protocol_version"],
         "model_set": meta["model_set"],
+        "display_aliases": meta.get("display_aliases"),
         "updated_at": now_iso(),
         # Only final units enter the leaderboard; retryable failures are left out.
         "units": [view for view in views if view["final"]],

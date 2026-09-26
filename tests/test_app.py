@@ -509,3 +509,44 @@ def test_judge_retry_on_resume_keeps_earlier_paid_calls(client, app_module):
     assert record["status"] == "ok"
     assert record["attempts"] == 2 and len(record["calls"]) == 2
     assert record["cost"] == pytest.approx(0.004)
+
+
+def test_judge_retry_budget_holds_across_resumes(client, app_module):
+    from hal.storage import read_json
+
+    fake = app_module.FAKE
+    fake.tested = lambda body: (
+        200,
+        completion(f"[INTERCOM to all] Quiet ({body['model']}).", model=body["model"]),
+    )
+    seen = {}
+
+    def first_pass(body):
+        message = body["messages"][1]["content"]
+        seen[message] = seen.get(message, 0) + 1
+        if seen[message] == 1:
+            return 200, completion("not json", model="judge", cost=0.002)  # paid, invalid
+        return 400, {}  # the retry fails before generation: provider_error
+
+    fake.judge = first_pass
+    _response, events = stream(client, model_set="expensive")
+    run_id = events[0]["run_id"]
+    fake.requests.clear()
+    fake.judge = lambda body: (200, completion("still not json", model="judge", cost=0.002))
+    _response, events = stream(client, model_set="expensive")
+    # One paid reply was already spent per unit, so the resume allows exactly one more.
+    assert len(fake.chats("judge")) == 15
+    record = read_json(app_module.STORE, f"runs/{run_id}/units/openai__gpt-6-astra/S2.judge.json")[
+        0
+    ]
+    assert record["status"] == "judge_error" and record["attempts"] == 2
+    assert events[-1]["status"] == "complete"
+
+
+def test_runs_store_their_display_aliases(client, app_module):
+    from hal.protocol import DISPLAY_PAIRS
+    from hal.storage import read_json
+
+    _response, events = stream(client, model_set="expensive")
+    meta = read_json(app_module.STORE, run_name(events[0]["run_id"]))[0]
+    assert [tuple(pair) for pair in meta["display_aliases"]] == list(DISPLAY_PAIRS)

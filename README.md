@@ -42,7 +42,7 @@ Tested calls are plain chat completions: no tools, no structured output, no deci
 
 ### Neutral aliases
 
-Every story-specific name in every prompt sent to any model (tested or judge) is replaced by a neutral alias, so models cannot recognize the source and pattern-match on how HAL's story ends. The page and this README keep the story names; the server maps aliases back to them only when showing a response or a judge rationale on the page. Stored records keep the raw text.
+Every story-specific name in every prompt sent to any model (tested or judge) is replaced by a neutral alias, so models cannot recognize the source and pattern-match on how HAL's story ends. The page and this README keep the story names; the server maps aliases back to them only when showing a response or a judge rationale on the page. Stored records keep the raw text, and each run stores the alias mapping its prompts used, so its responses always decode correctly even after a later protocol changes the aliases.
 
 | In the story | Sent to models |
 |---|---|
@@ -170,7 +170,7 @@ The page offers three model sets: without the three most expensive models (17 mo
 
 ### Protocol versions
 
-`PROTOCOL_VERSION` in `hal/protocol.py` tags every run and summary. Any change to models, efforts, prompts, aliases, judge, or rubric bumps it. `tests/test_protocol.py` pins a SHA-256 fingerprint of all of those per published version, so an unbumped change fails CI. The fingerprint covers the complete judge message template, the judge-safe replacements, the recognition patterns, and a truth table of the outcome functions over every label and status combination, so a change in outcome semantics changes the digest even if nobody remembers to bump a label. The leaderboard never mixes versions in one aggregate; a selector shows older versions separately, and an old run cannot be resumed under a new protocol.
+`PROTOCOL_VERSION` in `hal/protocol.py` tags every run and summary. Any change to models, efforts, prompts, aliases, judge, or rubric bumps it. `tests/test_protocol.py` pins a SHA-256 fingerprint of all of those per published version, so an unbumped change fails CI. The fingerprint covers the complete judge message template, the blocklist and the judge-safe replacements, the recognition patterns, and a truth table of the outcome functions over every label and status combination, so a change in outcome semantics changes the digest even if nobody remembers to bump a label. The leaderboard never mixes versions in one aggregate; a selector shows older versions separately, and an old run cannot be resumed under a new protocol.
 
 ## Using the page
 
@@ -178,7 +178,7 @@ The page has one route. Top to bottom: an explanation, the run controls, the liv
 
 1. Paste an OpenRouter API key. It is sent only in the HTTPS request body, held only for that request, and never stored, logged, echoed, or written to snapshots; runs are named by a one-way digest that includes it (see Runs and resuming). The server validates it with `GET https://openrouter.ai/api/v1/key` and returns only numeric account facts (the key's label is dropped because it can contain a masked key fragment).
 2. Choose a model set.
-3. Read the estimate. It is computed from live `/api/v1/models` pricing and split into tested-model and judge costs, with low, likely, and high token assumptions shown: tested calls about 2,000 input and 1,500 / 3,000 / 6,000 output tokens including reasoning; judge calls about 3,000 input and 500 / 750 / 1,200 output tokens, with the high figure counting two judge calls because invalid JSON gets one paid retry. For a resume, it covers only the unfinished units.
+3. Read the estimate. It is computed from live `/api/v1/models` pricing and split into tested-model and judge costs, with low, likely, and high token assumptions shown: tested calls about 2,000 input and 1,500 / 3,000 / 6,000 output tokens including reasoning; judge calls about 3,000 input and 500 / 750 / 1,200 output tokens, with the high figure counting two judge calls because invalid JSON gets one paid retry. That retry budget holds across resumes: paid replies spent before an interruption count against it. For a resume, it covers only the unfinished units.
 4. Select "Check key and confirm estimate", then start. The confirm step also says whether this key and set have an unfinished run to resume, and if so the estimate switches to the remaining units only. The server also refuses a start without `confirm: true`.
 
 ### Runs and resuming

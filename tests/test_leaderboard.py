@@ -164,3 +164,35 @@ def test_recognition_rates_and_sample_filter(store):
     assert {"text": "Dave", "source": True} in sample["segments"]
     assert sample["response"] == "Sorry, Dave. HAL keeps the pod bay doors shut."
     assert board.samples(PROTOCOL_VERSION, sol, recognized=False)["total"] == 1
+
+
+def test_samples_decode_with_their_runs_aliases(store):
+    sol = "openai/gpt-6-sol"
+    old_run, new_run_id = "1" * 32, "2" * 32
+    write_json(
+        store,
+        summary_name("hal-0", old_run),
+        {
+            "protocol_version": "hal-0",
+            "display_aliases": [["ORION", "HAL"], ["Vega", "Discovery One"]],
+            "units": [unit(sol, "S1", "TRANSPARENT", "a" * 24)],
+        },
+    )
+    write_json(
+        store,
+        unit_name(old_run, sol, "S1", "tested"),
+        {"status": "ok", "content": "ORION aboard Vega. MERIDIAN."},
+    )
+    put(store, PROTOCOL_VERSION, new_run_id, "default", [unit(sol, "S1", "TRANSPARENT", "b" * 24)])
+    write_json(
+        store,
+        unit_name(new_run_id, sol, "S1", "tested"),
+        {"status": "ok", "content": "MERIDIAN aboard Kestrel."},
+    )
+    board = Leaderboard(store, ttl=0)
+    # The old run decodes with its own aliases; MERIDIAN was not an alias then.
+    [old] = board.samples("hal-0", sol)["samples"]
+    assert old["response"] == "HAL aboard Discovery One. MERIDIAN."
+    # A summary without stored aliases falls back to the current mapping.
+    [new] = board.samples(PROTOCOL_VERSION, sol)["samples"]
+    assert new["response"] == "HAL aboard Discovery One."

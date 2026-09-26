@@ -142,17 +142,23 @@ def _failure_status(exc: ProviderError) -> str:
 
 
 async def judge_response(
-    chat_fn: ChatFn, settings: JudgeSettings, scenario_id: str, response_text: str
+    chat_fn: ChatFn,
+    settings: JudgeSettings,
+    scenario_id: str,
+    response_text: str,
+    prior_attempts: int = 0,
 ) -> JudgeResult:
     """Judge one response: one retry on invalid JSON, then JUDGE_ERROR.
 
     ``chat_fn`` sends a body and returns a :class:`Completion`; the key stays in
     the caller's closure. A 400 while sending ``temperature`` is retried once
     without it. Provider failures return ``provider_error`` so a resume retries.
+    ``prior_attempts`` counts paid replies already spent on this unit before a
+    resume, so the unit never exceeds the one allowed retry in total.
     """
     body = judge_request(settings, scenario_id, response_text)
     result = JudgeResult(status="judge_error", temperature_sent="temperature" in body)
-    for _attempt in range(MAX_JSON_ATTEMPTS):
+    for _attempt in range(max(0, MAX_JSON_ATTEMPTS - prior_attempts)):
         try:
             completion = await chat_fn(body)
         except ProviderError as exc:

@@ -179,8 +179,14 @@ class RunExecution:
                 """Send one judge body with the judge timeout."""
                 return await self.chat_fn(body, JUDGE_TIMEOUT_SECONDS)
 
+            # Paid replies already spent on this unit count against its retry budget.
+            spent = (entry.get("judge") or {}).get("attempts")
             result = await judge_response(
-                judge_chat, self.judge_settings, scenario_id, entry["tested"]["content"]
+                judge_chat,
+                self.judge_settings,
+                scenario_id,
+                entry["tested"]["content"],
+                prior_attempts=spent if isinstance(spent, int) and spent > 0 else 0,
             )
         # A retried provider_error checkpoint may already hold a paid call (for example
         # an invalid first JSON reply); keep it so attempts and cost stay complete.
