@@ -194,7 +194,7 @@ Each run writes only its own objects, and each flag is its own object, so concur
 Two backends implement the same compare-and-swap interface (`hal/storage.py`):
 
 * `STORAGE_BACKEND=gcs` with `GCS_BUCKET` (and optional `GCS_PREFIX`) uses the Cloud Storage API with generation preconditions. Any number of Cloud Run instances is safe. This is the recommended deployment.
-* The default local backend writes files under `EXPERIMENTS_DIR` (default `/experiments`). Its locks are `flock`-based and coordinate processes on one machine only, so **a Cloud Run service using the local backend must run with `--max-instances=1`**.
+* The default local backend writes files under `EXPERIMENTS_DIR` (default `/experiments`), which can be a Cloud Storage FUSE mount. Its lock is an `flock` on a file in the container's local temp directory, so it coordinates one container only: **a Cloud Run service using the local backend must run with `--max-instances=1`**.
 
 Only server-executed, server-judged units enter the leaderboard: there is no endpoint that accepts results, and summaries are written only by the run worker that made the calls. Run IDs are unguessable resume handles and never appear in public responses; samples and flags use a one-way unit reference instead. Per-IP sliding-window limits apply to run starts (`RUN_STARTS_PER_HOUR`, default 6), flags (`FLAGS_PER_HOUR`, default 60), and key checks (`KEY_CHECKS_PER_HOUR`, default 30). They are held in memory per instance, so with several instances the effective limit scales with the instance count. The app never stores or logs IP addresses (Cloud Run's own request logs are separate).
 
@@ -232,19 +232,34 @@ ruff format --check .
 
 ## Deployment
 
-The Dockerfile is the Cloud Build contract: it installs runtime requirements, runs as a non-root user, and smoke-tests the health endpoint, the page, and the catalog during the build. It runs Gunicorn with one gthread worker and 16 threads; each streamed run holds one thread.
+The Dockerfile is the Cloud Build contract, following ste-retention's: it installs runtime requirements, runs as a non-root user, parses the HTML, compiles the modules, and smoke-tests the health endpoint, the page, and the catalog with a throwaway store during the build. It runs Gunicorn with one gthread worker and `THREADS` (default 8) threads; each streamed run holds one thread, so `THREADS` bounds concurrent runs per instance.
 
-Recommended Cloud Run setup with Cloud Storage:
+Suggested names:
+
+* Bucket: `hal-9000-contradiction-lab` (bucket names are global, so add your project ID as a suffix if that one is taken).
+* Mount path: `/experiments`, which is the image's `EXPERIMENTS_DIR` default.
+
+Recommended setup, many instances, Cloud Storage API (no mount needed):
 
 ```sh
+gcloud storage buckets create gs://BUCKET --location REGION --uniform-bucket-level-access
 gcloud run deploy hal-lab --source . --region REGION \
   --set-env-vars STORAGE_BACKEND=gcs,GCS_BUCKET=BUCKET \
   --timeout 3600 --no-cpu-throttling
 ```
 
-Grant the service identity `roles/storage.objectAdmin` on the bucket. `--timeout 3600` is the Cloud Run maximum; a run that outlasts it can be resumed with its run ID. `--no-cpu-throttling` lets in-flight units finish and checkpoint after a browser disconnects.
+Single instance, Cloud Storage FUSE volume at `/experiments` using the file store:
 
-For the file backend instead, mount a volume at `/experiments` and add `--max-instances 1`.
+```sh
+gcloud run deploy hal-lab --source . --region REGION \
+  --add-volume name=experiments,type=cloud-storage,bucket=BUCKET \
+  --add-volume-mount volume=experiments,mount-path=/experiments \
+  --max-instances 1 --timeout 3600 --no-cpu-throttling
+```
+
+The file store needs `--max-instances 1` because its lock is local to one container. If you mount the bucket and also want several instances, set `STORAGE_BACKEND=gcs` and `GCS_BUCKET` as well; the app then writes through the API and ignores the mount.
+
+Grant the service identity `roles/storage.objectAdmin` on the bucket. `--timeout 3600` is the Cloud Run maximum; a run that outlasts it can be resumed with its run ID. `--no-cpu-throttling` lets in-flight units finish and checkpoint after a browser disconnects.
 
 Stored responses are model text, not personal data, but treat the bucket as you would any user-generated content: set a retention policy and limit operator access. Logs contain only run IDs, unit coordinates, and status values.
 

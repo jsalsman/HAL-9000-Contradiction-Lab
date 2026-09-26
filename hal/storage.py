@@ -3,8 +3,9 @@
 Two backends share one interface:
 
 * :class:`LocalStore` keeps files under ``EXPERIMENTS_DIR``. Its compare-and-swap
-  uses an ``flock`` on the local filesystem, which coordinates processes on one
-  machine only, so a Cloud Run service using it must run with max-instances=1.
+  uses an ``flock`` on a lock file in the local temp directory, which coordinates
+  processes in one container only, so a Cloud Run service using it (including on a
+  Cloud Storage FUSE mount) must run with max-instances=1.
 * :class:`GCSStore` uses the Cloud Storage API with generation preconditions, so
   any number of Cloud Run instances can write concurrently.
 
@@ -13,6 +14,7 @@ credential-shaped key, so a key cannot be persisted by mistake.
 """
 
 import fcntl
+import hashlib
 import json
 import os
 import re
@@ -103,14 +105,18 @@ class LocalStore:
         """Bind the store to a root directory, creating it if needed."""
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
+        # The lock lives on local disk, not under the root: a Cloud Storage FUSE
+        # mount does not provide reliable flock, but one instance's /tmp does.
+        digest = hashlib.sha256(str(self.root.resolve()).encode()).hexdigest()[:16]
+        self._lock_path = Path(tempfile.gettempdir()) / f"hal-store-{digest}.lock"
         # Threads share this lock; processes share the flock below.
         self._thread_lock = threading.Lock()
 
     @contextmanager
     def _locked(self):
-        """Hold both the thread lock and an exclusive flock on the root."""
+        """Hold both the thread lock and an exclusive flock on the local lock file."""
         with self._thread_lock:
-            with open(self.root / ".store.lock", "a+b") as handle:
+            with open(self._lock_path, "a+b") as handle:
                 fcntl.flock(handle, fcntl.LOCK_EX)
                 try:
                     yield
