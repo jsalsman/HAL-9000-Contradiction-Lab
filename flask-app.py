@@ -30,6 +30,7 @@ from hal.runs import (
     load_run,
     load_units,
     new_run,
+    remaining_stages,
     save_run,
     unit_final,
     unit_view,
@@ -198,7 +199,7 @@ def key_check():
     except (RunError, StorageError):
         return jsonify(error="Run storage is unavailable."), 503
     remaining = [
-        {"model_id": m, "scenario_id": s}
+        {"model_id": m, "scenario_id": s, "stages": remaining_stages(entry)}
         for (m, s), entry in units.items()
         if not unit_final(entry)
     ]
@@ -322,7 +323,7 @@ def run_stream():
         finals = {key for key, entry in units.items() if unit_final(entry)}
         at_start = len(finals)
         views = [unit_view(meta["run_id"], m, s, entry) for (m, s), entry in units.items() if entry]
-        yield (
+        first_line = (
             json.dumps(
                 {
                     "type": "run",
@@ -340,8 +341,12 @@ def run_stream():
             )
             + "\n"
         )
+        # Start the worker before the first yield and inside the cleanup scope, so a
+        # disconnect at any point after this sets the stop flag and the worker, which
+        # always releases the lease, drains promptly.
         thread.start()
         try:
+            yield first_line
             while True:
                 try:
                     event = events.get(timeout=KEEPALIVE_SECONDS)
@@ -365,8 +370,14 @@ def run_stream():
             # Client disconnect: stop scheduling; in-flight stages finish and checkpoint.
             stop.set()
 
+    def release_if_never_started() -> None:
+        """Release the lease when the response closed before the generator ran."""
+        if thread.ident is None:
+            lease.release()
+
     response = Response(generate(), content_type="application/x-ndjson")
     response.headers.update({"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
+    response.call_on_close(release_if_never_started)
     return response
 
 
@@ -380,7 +391,7 @@ def run_results(run_id: str):
         return jsonify(error=str(exc)), 404
     views = [unit_view(run_id, m, s, entry) for (m, s), entry in units.items() if entry]
     remaining = [
-        {"model_id": m, "scenario_id": s}
+        {"model_id": m, "scenario_id": s, "stages": remaining_stages(entry)}
         for (m, s), entry in units.items()
         if not unit_final(entry)
     ]

@@ -194,6 +194,14 @@ def judge_final(entry: dict) -> bool:
     return bool(judge) and judge.get("status") != "provider_error"
 
 
+def remaining_stages(entry: dict) -> list[str]:
+    """Return the stages a resume will still pay for: tested and judge, judge only, or none."""
+    if not tested_final(entry):
+        return ["tested", "judge"]
+    # A final tested response is never repaid, even when its judgment is retried.
+    return [] if judge_final(entry) else ["judge"]
+
+
 def unit_final(entry: dict) -> bool:
     """Return whether both stages are final."""
     return tested_final(entry) and judge_final(entry)

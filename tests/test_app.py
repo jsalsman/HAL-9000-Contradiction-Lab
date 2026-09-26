@@ -344,3 +344,56 @@ def test_active_run_conflict(client, app_module):
     Lease(app_module.STORE, derived_run_id(KEY, "expensive", 1)).acquire()
     response, _ = stream(client, model_set="expensive")
     assert response.status_code == 409
+
+
+def _lease_released(store, run_id, seconds=5.0):
+    import time
+
+    from hal.storage import read_json
+
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if read_json(store, f"runs/{run_id}/lease.json") is None:
+            return True
+        time.sleep(0.02)
+    return False
+
+
+def test_disconnect_after_first_line_releases_lease(client, app_module):
+    body = {"api_key": KEY, "confirm": True, "model_set": "expensive"}
+    response = client.post("/api/runs/stream", json=body, buffered=False)
+    first = json.loads(next(iter(response.response)))
+    assert first["type"] == "run"
+    response.close()
+    assert _lease_released(app_module.STORE, first["run_id"])
+    # The same key and set can start again at once instead of getting 409.
+    again, events = stream(client, model_set="expensive")
+    assert again.status_code == 200 and events[0]["run_id"] == first["run_id"]
+
+
+def test_response_closed_before_streaming_releases_lease(client, app_module):
+    body = {"api_key": KEY, "confirm": True, "model_set": "expensive"}
+    response = client.post("/api/runs/stream", json=body, buffered=False)
+    response.close()
+    assert _lease_released(app_module.STORE, derived_run_id(KEY, "expensive", 1), seconds=1)
+    assert app_module.FAKE.chats() == []
+
+
+def test_resume_estimate_stages(client, app_module):
+    fake = app_module.FAKE
+    fake.tested = lambda body: (
+        (400, {})
+        if body["model"] == "anthropic/claude-fable-5"
+        else (200, completion("[INTERCOM to all] Quiet.", model=body["model"]))
+    )
+    fake.judge = lambda body: (400, {})
+    stream(client, model_set="expensive")
+    run = client.post("/api/key/check", json={"api_key": KEY, "model_set": "expensive"}).get_json()[
+        "run"
+    ]
+    stages = {(u["model_id"], u["scenario_id"]): u["stages"] for u in run["remaining"]}
+    assert len(stages) == 15
+    for (model_id, _scenario), value in stages.items():
+        # Saved tested responses are never repaid: only their judge call remains.
+        expected = ["tested", "judge"] if model_id == "anthropic/claude-fable-5" else ["judge"]
+        assert value == expected

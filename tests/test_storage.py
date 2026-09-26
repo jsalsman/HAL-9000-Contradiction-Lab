@@ -120,3 +120,39 @@ def test_find_run_skips_completed_runs(store):
     save_run(store, second)
     run_id, number, meta = find_run(store, key, "expensive")
     assert (run_id, number) == (second["run_id"], 2) and meta["status"] == "interrupted"
+
+
+def test_lost_lease_cancels_in_flight_calls(store, monkeypatch):
+    import asyncio
+
+    import hal.runner as runner
+    from hal.judge import JudgeSettings
+    from hal.runs import RunActiveError, new_run
+
+    monkeypatch.setattr(runner, "HEARTBEAT_SECONDS", 0.05)
+    meta = new_run("expensive")
+    units = {(m, s): {} for m in meta["model_ids"] for s in meta["scenario_ids"]}
+    cancelled = []
+
+    class LostLease:
+        def heartbeat(self):
+            raise RunActiveError("Run ownership changed; this request stopped.")
+
+    async def slow_chat(body, timeout):
+        try:
+            await asyncio.sleep(30)
+        except asyncio.CancelledError:
+            cancelled.append(body["model"])
+            raise
+
+    execution = runner.RunExecution(
+        store, meta, units, LostLease(), slow_chat, lambda e: None, JudgeSettings()
+    )
+
+    async def go():
+        return await asyncio.wait_for(execution.execute(), timeout=5)
+
+    with pytest.raises(RunActiveError):
+        asyncio.run(go())
+    # Every in-flight paid call was cancelled when the heartbeat lost the lease.
+    assert len(cancelled) == 12

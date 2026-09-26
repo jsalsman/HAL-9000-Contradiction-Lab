@@ -156,17 +156,21 @@
     confirmButton.disabled = Boolean(controller);
     let units, totals, missing;
     if (resumeInfo) {
-      // Sum per-unit costs over exactly the units the resume still needs.
+      // Sum costs over exactly the stages the resume still pays for: a unit whose
+      // tested response is already saved needs only its judge call.
       units = resumeInfo.remaining.length;
       totals = {tested:{low:0, likely:0, high:0}, judge:{low:0, likely:0, high:0}, total:{low:0, likely:0, high:0}};
       missing = [];
       for (const unit of resumeInfo.remaining) {
         const costs = estimates.per_model[unit.model_id];
         if (!costs) { missing.push(unit.model_id); continue; }
+        const stages = Array.isArray(unit.stages) ? unit.stages : ["tested", "judge"];
         for (const level of ["low", "likely", "high"]) {
-          totals.tested[level] += costs.tested[level];
-          totals.judge[level] += costs.judge[level];
-          totals.total[level] += costs.tested[level] + costs.judge[level];
+          const tested = stages.includes("tested") ? costs.tested[level] : 0;
+          const judge = stages.includes("judge") ? costs.judge[level] : 0;
+          totals.tested[level] += tested;
+          totals.judge[level] += judge;
+          totals.total[level] += tested + judge;
         }
       }
     } else {

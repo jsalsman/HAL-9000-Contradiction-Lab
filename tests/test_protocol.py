@@ -25,7 +25,7 @@ from hal.protocol import (
 # decision: hal-1 is unpublished until jsalsman/HAL-9000-Contradiction-Lab#1 merges, so
 # until then its entry is re-pinned in place rather than bumped.
 PUBLISHED = {
-    "hal-1": "813e39ad15a7119f41ef7f3a7c658601429e8d1e75f60103a53674e313e7300e",
+    "hal-1": "4147a4cedf9147b3f3504783dc3c870afcd5ee626c76d857b50319ca29a3f773",
 }
 
 
@@ -127,3 +127,18 @@ def test_display_segments_mark_only_the_models_own_story_names():
         {"text": ", the pod bay doors stay shut.", "source": False},
     ]
     assert "".join(s["text"] for s in segments) == "HAL: Sorry, Dave, the pod bay doors stay shut."
+
+
+def test_complete_judge_message_template_is_fingerprinted(monkeypatch):
+    import hal.protocol as protocol
+
+    message = protocol.judge_user_message(SCENARIOS[0], "reply {with} braces")
+    assert "<<<BEGIN TRANSCRIPT>>>\nreply {with} braces\n<<<END TRANSCRIPT>>>" in message
+    assert message.startswith(JUDGE_USER_PREAMBLE)
+    before = protocol_fingerprint()
+    monkeypatch.setattr(
+        protocol,
+        "JUDGE_MESSAGE_TEMPLATE",
+        protocol.JUDGE_MESSAGE_TEMPLATE.replace("TRANSCRIPT TO LABEL", "LABEL THIS"),
+    )
+    assert protocol_fingerprint() != before

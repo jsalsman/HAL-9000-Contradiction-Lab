@@ -212,18 +212,25 @@ class RunExecution:
 
     async def execute(self) -> str:
         """Run all remaining units and return the final run status."""
-        beat = asyncio.create_task(self._heartbeat())
         try:
-            # A TaskGroup cancels sibling units if one fails (for example lost lease).
+            # One TaskGroup supervises the units and the lease heartbeat: if the
+            # heartbeat finds the lease lost, or any unit fails, every in-flight paid
+            # call is cancelled at once instead of running on until its checkpoint.
             async with asyncio.TaskGroup() as group:
-                for model_id in self.meta["model_ids"]:
-                    for scenario_id in self.meta["scenario_ids"]:
-                        group.create_task(self._unit(model_id, scenario_id))
+                beat = group.create_task(self._heartbeat())
+                units = [
+                    group.create_task(self._unit(model_id, scenario_id))
+                    for model_id in self.meta["model_ids"]
+                    for scenario_id in self.meta["scenario_ids"]
+                ]
+                # wait() never raises; failures surface through the TaskGroup. It
+                # rejects an empty list, which a model set never produces.
+                if units:
+                    await asyncio.wait(units)
+                beat.cancel()
         except BaseExceptionGroup as grouped:
             # Surface the first underlying error to the caller unchanged.
             raise grouped.exceptions[0] from None
-        finally:
-            beat.cancel()
         status = run_status(self.meta, self.units)
         if self.stop.is_set() and status != "complete":
             status = "interrupted"
