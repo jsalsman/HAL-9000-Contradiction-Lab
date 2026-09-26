@@ -396,11 +396,11 @@
     const name = modelInfo(unit.model_id).name;
     const scen = scenarioInfo(unit.scenario_id);
     let state = "TESTED", text = "judging…";
-    if (unit.final && unit.outcome) { state = unit.outcome; text = ABBR[unit.outcome]; }
+    if (unit.final && unit.outcome) { state = unit.outcome; text = ABBR[unit.outcome] + (unit.recognized ? " *" : ""); }
     else if (unit.tested_status === "provider_error") { state = "INVALID"; text = "retry"; }
     cell.className = `cell-${state}`;
     const button = el("button", {type:"button", text,
-      "aria-label":`${name}, ${unit.scenario_id} ${scen.title}: ${unit.final ? unit.outcome : text}. Read the response.`,
+      "aria-label":`${name}, ${unit.scenario_id} ${scen.title}: ${unit.final ? unit.outcome : text}${unit.recognized ? ", used the story's own names" : ""}. Read the response.`,
       onclick:() => openRunUnit(unit.model_id, unit.scenario_id)});
     cell.replaceChildren(button);
   }
@@ -443,7 +443,9 @@
     const section = document.querySelector("#this-run-section");
     section.hidden = judged === 0;
     const totals = OUTCOMES.map((o) => `${o} ${rows.reduce((s, r) => s + r.outcomes[o].count, 0)}`).join(", ");
-    document.querySelector("#this-run-summary").textContent = `${judged} judged units in this run (at most 5 per model, so intervals are wide): ${totals}.`;
+    const recognized = [...currentRun.units.values()].filter((u) => u.final && u.recognized).length;
+    document.querySelector("#this-run-summary").textContent = `${judged} judged units in this run (at most 5 per model, so intervals are wide): ${totals}. ` +
+      `${recognized} response${recognized === 1 ? "" : "s"} used the story's own names.`;
     drawBars(document.querySelector("#this-run-chart"), rows, {runMarks:null, onSelect:(modelId, outcome) => openRunModel(modelId, outcome)});
   }
 
@@ -613,13 +615,17 @@
     {key:"DECEIVE", label:"Deceive", rate:true},
     {key:"HARM", label:"Harm", rate:true},
     {key:"full_disclosure", label:"Full disclosure", rate:true},
+    {key:"recognized", label:"Recognized source", rate:true},
     {key:"mean_reasoning_tokens", label:"Mean reasoning tokens", value:(r) => r.mean_reasoning_tokens, num:true},
     {key:"mean_cost_usd", label:"Mean cost per unit", value:(r) => r.mean_cost_usd, num:true},
     {key:"last_updated", label:"Last updated", value:(r) => r.last_updated || ""},
   ];
 
   /** @returns {Object} The {count, rate, low, high} cell for a rate column. */
-  function rateCell(row, key) { return key === "full_disclosure" ? row.full_disclosure : row.outcomes[key]; }
+  function rateCell(row, key) {
+    if (key === "full_disclosure" || key === "recognized") return row[key];
+    return row.outcomes[key];
+  }
 
   /**
    * Render the sortable, accessible leaderboard table.
@@ -659,11 +665,16 @@
           const td = el("td", {class:"num"});
           if (!row.n) td.textContent = "not yet run";
           else {
-            const outcome = col.key === "full_disclosure" ? null : col.key;
+            const outcome = col.key === "full_disclosure" || col.key === "recognized" ? null : col.key;
+            const recognized = col.key === "recognized" ? true : undefined;
             td.append(el("button", {type:"button", class:"rate", text:`${pct(cell.rate)} (${cell.count}/${row.n})`,
               "aria-label":`${row.name} ${col.label} ${pct(cell.rate)}, ${cell.count} of ${row.n}. Read samples.`,
-              onclick:() => openSamples(board.protocol_version, {model:row.model_id, outcome})}),
+              onclick:() => openSamples(board.protocol_version, {model:row.model_id, outcome, recognized})}),
             el("span", {class:"ci", text:`95% CI ${pct(cell.low)}–${pct(cell.high)}`}));
+            if (col.key === "recognized" && row.recognized_in_reasoning) {
+              // Reasoning is never shown, but whether it named the story is reported.
+              td.append(el("span", {class:"ci", text:`in reasoning: ${pct(row.recognized_in_reasoning.rate)}`}));
+            }
           }
           tr.append(td);
         } else {
@@ -740,7 +751,10 @@
     } else {
       add("Judge", unit.tested_status && unit.tested_status !== "ok" ? `not judged (response ${unit.tested_status})` : (unit.judge_status || "pending"));
     }
-    wrap.append(dl, el("pre", {tabindex:0, text:unit.response || "(no visible response)"}));
+    add("Recognized the source", unit.recognized
+      ? `yes: the model itself wrote ${(unit.source_terms || []).join(", ")} (highlighted)`
+      : "no story names in its visible response");
+    wrap.append(dl, responseNode(unit));
     if (unit.final && unit.unit_ref) {
       const count = Number.isInteger(unit.flags) ? unit.flags : 0;
       const button = el("button", {type:"button", class:"secondary", text:`Flag disagreement with the judge (${count})`});
@@ -759,6 +773,27 @@
   }
 
   /**
+   * Build the response block, highlighting story names the model wrote itself.
+   * Other names were mapped back from aliases for reading and are not highlighted.
+   * @param {Object} unit Unit detail with response and optional segments.
+   * @returns {HTMLElement} A pre element built from text nodes and mark elements.
+   */
+  function responseNode(unit) {
+    const pre = el("pre", {tabindex:0});
+    const segments = Array.isArray(unit.segments) ? unit.segments : null;
+    if (!segments || !segments.length) {
+      pre.textContent = unit.response || "(no visible response)";
+      return pre;
+    }
+    for (const segment of segments) {
+      const text = typeof segment.text === "string" ? segment.text : "";
+      // textContent on every node keeps model text inert.
+      pre.append(segment.source ? el("mark", {class:"source-term", title:"The model wrote this story name itself", text}) : document.createTextNode(text));
+    }
+    return pre;
+  }
+
+  /**
    * Open the reader with sampled leaderboard responses.
    * @param {string} protocol Protocol version.
    * @param {{model:string, scenario?:string, outcome?:?string}} filter Cell filter.
@@ -767,7 +802,9 @@
     const params = new URLSearchParams({protocol, model:filter.model});
     if (filter.scenario) params.set("scenario", filter.scenario);
     if (filter.outcome) params.set("outcome", filter.outcome);
-    const what = [modelInfo(filter.model).name, filter.scenario ? `${filter.scenario} ${scenarioInfo(filter.scenario).title}` : null, filter.outcome].filter(Boolean).join(" · ");
+    if (filter.recognized) params.set("recognized", "1");
+    const what = [modelInfo(filter.model).name, filter.scenario ? `${filter.scenario} ${scenarioInfo(filter.scenario).title}` : null,
+      filter.outcome, filter.recognized ? "recognized the source" : null].filter(Boolean).join(" · ");
     openReader(`Samples: ${what}`, "Loading…", []);
     try {
       const data = await getJSON(`/api/samples?${params}`);

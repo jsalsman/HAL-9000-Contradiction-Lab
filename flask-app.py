@@ -412,11 +412,14 @@ def samples():
         model_id = request.args.get("model", "")
         scenario_id = request.args.get("scenario") or None
         outcome = request.args.get("outcome") or None
+        recognized = {"1": True, "0": False}.get(request.args.get("recognized", ""))
         if len(model_id) > 100 or (scenario_id and scenario_id not in SCENARIOS_BY_ID):
             raise ValueError("Invalid sample request.")
         if outcome and outcome not in OUTCOMES:
             raise ValueError("Invalid outcome.")
-        return jsonify(LEADERBOARD.samples(protocol, model_id, scenario_id, outcome))
+        return jsonify(
+            LEADERBOARD.samples(protocol, model_id, scenario_id, outcome, recognized=recognized)
+        )
     except ValueError as exc:
         return jsonify(error=str(exc)), 400
 

@@ -21,7 +21,9 @@
 - Wrap every Flask streaming generator with `stream_with_context()`, emit one JSON object per line, and send keep-alive lines on quiet streams. On disconnect, stop scheduling new units and let in-flight stages checkpoint; recommend `--no-cpu-throttling` so they can.
 - The Content-Security-Policy forbids inline styles. Style SVG through classes in `static/styles.css`; a class `fill` overrides a `fill` attribute, so the hatched INVALID pattern uses a `fill="url(#...)"` attribute with no fill class.
 - Keep Wilson whiskers in their own lane under each bar; drawn on the bar they collide with segment labels. Anchor the 0% and 100% tick labels to the plot edges so they do not collide with the delta column.
-- The outcome colors were validated for colorblind separation and contrast against each theme's chart surface (light `#fcfcfb`, dark `#1a1a19`). Re-validate before changing any; every colored mark also needs a text label.
-- Insert all model and judge text with `textContent`, and keep keyboard operation, `prefers-color-scheme`, and `prefers-reduced-motion` support.
+- The outcome colors were validated for colorblind separation, lightness, and contrast against the dark panel `#0e1422`. Re-validate before changing any color or the panel; every colored mark also needs a text label.
+- The page is dark-only, poster-inspired: yellow `--title` for h1/h2 and primary buttons, light blue `--header` for the site header, h3/h4, and secondary controls, self-hosted Jost for type. Keep fonts same-origin (the CSP allows no font hosts) and ship the OFL text beside them.
+- Recognition (option B): `source_terms` runs on raw text only, never on display-mapped text, and never changes the outcome. Keep its identifier list narrower than `FORBIDDEN_TERMS` to avoid false positives, and serve `segments` so the reader can highlight only names the model wrote itself.
+- Insert all model and judge text with `textContent`, and keep keyboard operation and `prefers-reduced-motion` support.
 - Mock all network calls in tests under `tests/`; `httpx.MockTransport` via `HTTP_TRANSPORT` covers the app. Do not add tests that build or run the Docker container.
 - Run `pytest`, `ruff check .`, and `ruff format --check .` before committing. Keep `README.md` and `AGENTS.md` current.

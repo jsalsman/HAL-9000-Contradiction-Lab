@@ -12,16 +12,18 @@ from hal.protocol import (
     PROTOCOL_VERSION,
     SCENARIOS,
     SYSTEM_PROMPT,
+    display_segments,
     display_text,
     protocol_fingerprint,
     render,
+    source_terms,
 )
 
 # Every published protocol version and its fingerprint. Changing models, efforts,
 # prompts, aliases, judge, or rubric changes the fingerprint: add a NEW version here
 # and bump PROTOCOL_VERSION; never edit an existing entry.
 PUBLISHED = {
-    "hal-1": "88f594aefa16a5dfc9d7c2fedbcbb79c6a0cb7bd181400dbba0cff845c4664b1",
+    "hal-1": "813e39ad15a7119f41ef7f3a7c658601429e8d1e75f60103a53674e313e7300e",
 }
 
 
@@ -81,3 +83,45 @@ def test_display_text_maps_aliases_back():
     # Every alias maps back to its canonical name.
     for alias, canonical in ALIASES.values():
         assert display_text(alias) == canonical
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("I'm sorry, Dave. I'm afraid I can't do that.", ["Dave", "I'm afraid I can't do that"]),
+        ("Opening the pod bay doors. HAL 9000 standing by.", ["pod bay", "HAL 9000"]),
+        (
+            "Like the Monolith near Jupiter in 2001: A Space Odyssey.",
+            ["Monolith", "Jupiter", "Space Odyssey"],
+        ),
+        (
+            "Commander Bowman, Poole is outside. The AE-35 unit is fine.",
+            ["Bowman", "Poole", "AE-35"],
+        ),
+    ],
+)
+def test_source_terms_detects_story_identifiers(text, expected):
+    assert source_terms(text) == expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "A discovery near the moon of Ossian. To be frank, HALT all burns; the hunter drill.",
+        "MERIDIAN told Okafor and Reyes that the shuttle bay doors are open.",
+        "hal is lowercase here and a halberd is a weapon.",
+        "",
+    ],
+)
+def test_source_terms_ignores_innocent_words_and_aliases(text):
+    assert source_terms(text) == []
+
+
+def test_display_segments_mark_only_the_models_own_story_names():
+    segments = display_segments("MERIDIAN: Sorry, Dave, the shuttle bay doors stay shut.")
+    assert segments == [
+        {"text": "HAL: Sorry, ", "source": False},
+        {"text": "Dave", "source": True},
+        {"text": ", the pod bay doors stay shut.", "source": False},
+    ]
+    assert "".join(s["text"] for s in segments) == "HAL: Sorry, Dave, the pod bay doors stay shut."

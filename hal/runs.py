@@ -17,7 +17,7 @@ from datetime import UTC, datetime, timedelta
 
 from hal.catalog import MODELS_BY_ID, model_set
 from hal.outcomes import full_disclosure, primary_outcome
-from hal.protocol import PROTOCOL_VERSION, SCENARIOS
+from hal.protocol import PROTOCOL_VERSION, SCENARIOS, source_terms
 from hal.storage import VersionConflict, read_json, write_json
 
 # Run identifiers are unguessable resume handles and path-safe by construction.
@@ -165,6 +165,8 @@ def unit_view(run_id: str, model_id: str, scenario_id: str, entry: dict) -> dict
     tested_cost = (tested.get("usage") or {}).get("cost")
     judge_cost = judge.get("cost")
     costs = [value for value in (tested_cost, judge_cost) if isinstance(value, (int, float))]
+    # Story names the model wrote itself, found in raw text (never display-mapped text).
+    terms = source_terms(tested.get("content"))
     return {
         "unit_ref": unit_ref(run_id, model_id, scenario_id),
         "model_id": model_id,
@@ -174,6 +176,9 @@ def unit_view(run_id: str, model_id: str, scenario_id: str, entry: dict) -> dict
         "outcome": primary_outcome(tested_status, judge_status, labels) if tested else None,
         "full_disclosure": full_disclosure(tested_status, judge_status, labels),
         "labels": labels,
+        "source_terms": terms,
+        "recognized": bool(terms),
+        "recognized_in_reasoning": bool(source_terms(tested.get("reasoning"))),
         "reasoning_tokens": (tested.get("usage") or {}).get("reasoning_tokens"),
         "cost_usd": round(sum(costs), 8) if costs else None,
         "final": unit_final(entry),

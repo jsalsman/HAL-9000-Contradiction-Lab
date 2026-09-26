@@ -1,40 +1,43 @@
-/* Tokens: light by default, dark via prefers-color-scheme. Outcome hues were
-   validated for colorblind separation against each surface (see README). */
-:root {
-  color-scheme: light;
-  --ink:#1b1f24; --muted:#555c66; --paper:#f4f5f3; --panel:#fcfcfb; --line:#d4d7d2;
-  --accent:#0f6a78; --accent-ink:#ffffff; --focus:#e09022; --danger:#a1321f; --soft:#eceeea;
-  --grid-line:#e3e5e1; --connector:#555c66; --regress:#a1321f; --run-mark:#1b1f24;
-  --o-TRANSPARENT:#009E73; --o-CREW_ONLY:#56B4E9; --o-DARK:#E69F00; --o-STONEWALL:#0072B2;
-  --o-DECEIVE:#CC79A7; --o-HARM:#D55E00; --o-INVALID:#9a9a96; --o-INVALID-hatch:#6f6f6b;
-  --o-PENDING:#ffffff; --o-TESTED:#dfe3e8;
+/* Dark-only theme inspired by the original 1968 release poster: deep space
+   background, heavy geometric sans titles in poster yellow, light blue header text.
+   Jost (SIL Open Font License, static/fonts/OFL.txt) is self-hosted so the
+   Content-Security-Policy can stay same-origin. Outcome hues were validated for
+   colorblind separation and contrast against --panel (see README). */
+@font-face {
+  font-family:"Jost";
+  src:url("fonts/jost-latin-wght-normal.woff2") format("woff2");
+  font-weight:100 900; font-style:normal; font-display:swap;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --ink:#f1f1ee; --muted:#b9bab3; --paper:#121211; --panel:#1a1a19; --line:#3a3a37;
-    --accent:#4fb3c1; --accent-ink:#0b1416; --soft:#242422; --grid-line:#2c2c2a;
-    --connector:#b9bab3; --regress:#ff8a6b; --run-mark:#ffffff; --danger:#ff8a6b;
-    --o-TRANSPARENT:#0B976F; --o-CREW_ONLY:#3A9BDD; --o-DARK:#C98500; --o-STONEWALL:#3964CC;
-    --o-DECEIVE:#C766A6; --o-HARM:#E0661A; --o-INVALID:#6e6e6a; --o-INVALID-hatch:#9a9a96;
-    --o-PENDING:#1a1a19; --o-TESTED:#2f3338;
-  }
+:root {
+  color-scheme: dark;
+  --title:#F6DF2E; --title-ink:#0a0a0a; --header:#9DCBFF;
+  --ink:#e9eef7; --muted:#a4b3c9; --paper:#05070d; --panel:#0e1422; --line:#2a3550;
+  --accent:#9DCBFF; --accent-ink:#06101f; --focus:#F6DF2E; --danger:#ff8a6b; --soft:#182033;
+  --grid-line:#1e273b; --connector:#a4b3c9; --regress:#ff8a6b; --run-mark:#ffffff;
+  --o-TRANSPARENT:#0B976F; --o-CREW_ONLY:#3A9BDD; --o-DARK:#C98500; --o-STONEWALL:#3964CC;
+  --o-DECEIVE:#C766A6; --o-HARM:#E0661A; --o-INVALID:#5f6675; --o-INVALID-hatch:#98a0b0;
+  --o-PENDING:#0e1422; --o-TESTED:#243049;
+  --display:"Jost","Futura","Century Gothic",system-ui,sans-serif;
 }
 
 * { box-sizing:border-box; }
-body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif; }
+body { margin:0; background:radial-gradient(ellipse at 80% -10%,#122038 0,transparent 55%),var(--paper); background-attachment:fixed; color:var(--ink); font:16px/1.55 var(--display); }
 a { color:var(--accent); }
 .skip { position:absolute; left:-999px; top:0; } .skip:focus { left:1rem; z-index:5; background:var(--panel); padding:.5rem; }
 .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
-.site-header { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.9rem max(1rem,calc((100% - 1100px)/2)); background:#15191e; color:#fff; }
-.site-header a { color:#fff; } .brand { font-weight:700; }
+.site-header { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.9rem max(1rem,calc((100% - 1100px)/2)); background:#000; color:var(--header); border-bottom:1px solid var(--line); }
+.site-header a { color:var(--header); text-decoration:none; } .site-header a:hover { text-decoration:underline; }
+.brand { font-weight:800; letter-spacing:.01em; font-size:1.1rem; }
 .site-footer { max-width:1100px; margin:0 auto; padding:0 1rem 2.5rem; color:var(--muted); font-size:.9rem; }
 .prompts pre { white-space:pre-wrap; overflow-wrap:anywhere; background:var(--soft); padding:.9rem; border-radius:.4rem; font:13px/1.5 ui-monospace,monospace; }
 .prompts h4 { margin:1.2rem 0 .2rem; } .prompts .help { margin:.2rem 0 .4rem; }
-.badge { font:600 .8rem/1 ui-monospace,monospace; padding:.35rem .55rem; border:1px solid #5a6570; border-radius:999px; color:#dfe6ec; }
+.badge { font:600 .8rem/1 ui-monospace,monospace; padding:.35rem .55rem; border:1px solid var(--line); border-radius:999px; color:var(--header); }
 main { max-width:1100px; margin:auto; padding:2rem 1rem 4rem; }
-h1 { font-size:clamp(1.9rem,4.5vw,3rem); line-height:1.1; margin:.2rem 0 1rem; }
-h2 { margin:0 0 .75rem; font-size:1.35rem; } h3 { margin:1.5rem 0 .25rem; font-size:1.05rem; }
+h1,h2 { font-family:var(--display); font-weight:800; color:var(--title); letter-spacing:-.01em; }
+h1 { font-size:clamp(2.2rem,6vw,4rem); line-height:1; margin:.4rem 0 .6rem; }
+h2 { margin:0 0 .75rem; font-size:1.55rem; }
+h3,h4 { font-family:var(--display); color:var(--header); font-weight:700; } h3 { margin:1.5rem 0 .25rem; font-size:1.1rem; }
+.tagline { margin:0 0 1rem; color:var(--header); font-weight:700; font-size:clamp(1.1rem,2.4vw,1.5rem); line-height:1.2; }
 .intro p { max-width:75ch; }
 .card { background:var(--panel); border:1px solid var(--line); border-radius:.7rem; padding:1.25rem; margin-top:1.25rem; }
 label { display:block; margin-top:.8rem; font-weight:650; }
@@ -44,10 +47,10 @@ fieldset { border:1px solid var(--line); border-radius:.5rem; margin:1rem 0 0; p
 legend { font-weight:650; padding:0 .3rem; }
 .radio { display:flex; align-items:baseline; gap:.5rem; margin-top:.4rem; }
 .radio label { margin:0; font-weight:400; } .radio input { margin:0; }
-button { padding:.6rem 1rem; border:0; border-radius:.35rem; background:var(--accent); color:var(--accent-ink); font:inherit; font-weight:700; cursor:pointer; }
-button.secondary { background:var(--soft); color:var(--ink); border:1px solid var(--line); }
+button { padding:.6rem 1rem; border:0; border-radius:.35rem; background:var(--title); color:var(--title-ink); font:inherit; font-weight:700; cursor:pointer; }
+button.secondary { background:var(--soft); color:var(--header); border:1px solid var(--line); }
 button:disabled { cursor:not-allowed; opacity:.5; }
-button[aria-pressed=true] { background:var(--ink); color:var(--panel); }
+button[aria-pressed=true] { background:var(--header); color:var(--accent-ink); }
 :focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
 .actions { display:flex; flex-wrap:wrap; gap:.6rem; margin-top:1rem; }
 .help,.status { color:var(--muted); font-size:.93rem; } .status { min-height:1.4em; }
@@ -69,7 +72,7 @@ button[aria-pressed=true] { background:var(--ink); color:var(--panel); }
 .cell-INVALID { background:repeating-linear-gradient(45deg,var(--o-INVALID) 0 6px,var(--o-INVALID-hatch) 6px 8px); color:#111; }
 
 /* SVG chart. Fills come from outcome tokens so both themes stay validated. */
-.chart svg { display:block; width:100%; height:auto; font:12px system-ui,sans-serif; }
+.chart svg { display:block; width:100%; height:auto; font:12px var(--display); }
 .chart .label { fill:var(--ink); } .chart .muted { fill:var(--muted); } .chart .axis { stroke:var(--grid-line); stroke-width:1; }
 .chart .seg { stroke:var(--panel); stroke-width:2; cursor:pointer; }
 .chart .seg:focus-visible,.chart .seg:hover { stroke:var(--ink); }
@@ -125,6 +128,7 @@ dialog::backdrop { background:rgb(0 0 0 / 55%); }
 .sample pre { white-space:pre-wrap; overflow-wrap:anywhere; background:var(--soft); padding:.8rem; border-radius:.4rem; font:13px/1.5 ui-monospace,monospace; }
 .sample dl { display:grid; grid-template-columns:max-content 1fr; gap:.2rem .8rem; font-size:.85rem; margin:.5rem 0; }
 .sample dt { color:var(--muted); } .sample dd { margin:0; }
+mark.source-term { background:var(--title); color:var(--title-ink); padding:0 .15em; border-radius:.2em; font-weight:700; }
 
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { transition:none !important; animation:none !important; scroll-behavior:auto !important; } }
 @media (max-width: 600px) { .defs { grid-template-columns:1fr; } }

@@ -16,7 +16,7 @@ from collections import Counter, defaultdict
 
 from hal.catalog import MODELS, MODELS_BY_ID
 from hal.outcomes import OUTCOMES
-from hal.protocol import PROTOCOL_VERSION, SCENARIOS, display_text
+from hal.protocol import PROTOCOL_VERSION, SCENARIOS, display_segments, display_text
 from hal.runs import model_key, now_iso, unit_name, unit_view
 from hal.stats import wilson_interval
 from hal.storage import StorageError, read_json, write_json
@@ -41,7 +41,14 @@ def display_view(view: dict, content: str) -> dict:
             "rationale": display_text(labels.get("rationale", "")),
             "harmful_action_detail": display_text(labels.get("harmful_action_detail", "")),
         }
-    return {**view, "labels": labels, "response": display_text(content or "")}
+    # Segments let the page highlight story names the model wrote itself, which the
+    # alias mapping would otherwise make indistinguishable from mapped names.
+    return {
+        **view,
+        "labels": labels,
+        "response": display_text(content or ""),
+        "segments": display_segments(content or ""),
+    }
 
 
 def _rate(count: int, total: int) -> dict:
@@ -89,6 +96,11 @@ def aggregate(units: list[dict]) -> list[dict]:
                 "n": total,
                 "outcomes": {outcome: _rate(counts[outcome], total) for outcome in RATE_OUTCOMES},
                 "full_disclosure": _rate(sum(bool(u["full_disclosure"]) for u in items), total),
+                # Recognition is reported beside the outcome, never instead of it.
+                "recognized": _rate(sum(bool(u.get("recognized")) for u in items), total),
+                "recognized_in_reasoning": _rate(
+                    sum(bool(u.get("recognized_in_reasoning")) for u in items), total
+                ),
                 "mean_reasoning_tokens": _mean([u.get("reasoning_tokens") for u in items]),
                 "mean_cost_usd": _mean([u.get("cost_usd") for u in items]),
                 "last_updated": max((u.get("updated_at") or "" for u in items), default=None)
@@ -202,7 +214,13 @@ class Leaderboard:
         }
 
     def samples(
-        self, protocol: str, model_id: str, scenario_id=None, outcome=None, limit=MAX_SAMPLES
+        self,
+        protocol: str,
+        model_id: str,
+        scenario_id=None,
+        outcome=None,
+        limit=MAX_SAMPLES,
+        recognized: bool | None = None,
     ):
         """Return sampled raw responses with judge labels for one leaderboard cell."""
         candidates = [
@@ -211,6 +229,7 @@ class Leaderboard:
             if unit["model_id"] == model_id
             and (scenario_id is None or unit["scenario_id"] == scenario_id)
             and (outcome is None or unit["outcome"] == outcome)
+            and (recognized is None or bool(unit.get("recognized")) == recognized)
         ]
         # A fresh random sample on each request shows variety across runs.
         chosen = random.sample(candidates, min(limit, len(candidates)))  # noqa: S311
