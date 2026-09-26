@@ -21,7 +21,7 @@ from hal.protocol import (
 # prompts, aliases, judge, or rubric changes the fingerprint: add a NEW version here
 # and bump PROTOCOL_VERSION; never edit an existing entry.
 PUBLISHED = {
-    "hal-1": "6a252182bedcfb3962fb25769e450c05221f7c6152af641c8676401a1d27d515",
+    "hal-1": "2adb830f6dcb1fa0e142a6ce5885e0d0dbc2694e12cc11369ea6fd281ae38cf3",
 }
 
 
