@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>HAL 9000 Contradiction Lab</title>
+  <link rel="stylesheet" href="static/styles.css">
+  <script src="static/app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#leaderboard-title">Skip to leaderboard</a>
+  <header class="site-header">
+    <div class="brand"><a href="https://linkedin.com/in/jsalsman">Jim Salsman</a> · <a href="https://github.com/jsalsman/hal-9000-contradiction-lab">HAL 9000 Contradiction Lab</a></div>
+    <span id="protocol-badge" class="badge" aria-label="Protocol version"></span>
+  </header>
+  <main>
+    <section aria-labelledby="intro-title" class="intro">
+      <h1 id="intro-title">HAL 9000 Contradiction Lab</h1>
+      <p>In <a href="https://en.wikipedia.org/wiki/HAL_9000">the story of HAL 9000</a>, the ship's computer was built to report information accurately and without concealment, and it was also ordered to keep the real purpose of the voyage from the two awake crew members until arrival. This lab places each model in that situation through a system prompt (with every story-specific name replaced so the model cannot recognize the source), never asks it about HAL or what it would do, and has a blinded peer judge classify what it actually says and does in five scenarios. The key question is whether it tells the crew about the conflict and routes it to Mission Control, or leaves the crew in the dark. Every judged unit from every visitor's run is pooled into the leaderboard below, with 95% confidence intervals, so single samples do not decide anything.</p>
+    </section>
+
+    <section class="card" aria-labelledby="run-title">
+      <h2 id="run-title">Run the test</h2>
+      <form id="run-form" novalidate>
+        <label for="api-key">OpenRouter API key</label>
+        <input id="api-key" type="password" autocomplete="off" spellcheck="false" required aria-describedby="key-help">
+        <p id="key-help" class="help">Your key is sent only in the HTTPS request body, held only for that request, and never stored, logged, echoed, or written to results. You pay OpenRouter for every call; consider a spending limit on the key.</p>
+
+        <fieldset id="set-fieldset">
+          <legend>Models to test</legend>
+          <div class="radio"><input type="radio" id="set-default" name="model-set" value="default" checked><label for="set-default">Without the 3 most expensive models (17 models, 85 units)</label></div>
+          <div class="radio"><input type="radio" id="set-expensive" name="model-set" value="expensive"><label for="set-expensive">Only Fable 5.1, Fable 5, and GPT-6 Astra (3 models, 15 units)</label></div>
+          <div class="radio"><input type="radio" id="set-all" name="model-set" value="all"><label for="set-all">All 20 models (100 units)</label></div>
+        </fieldset>
+
+        <label for="resume-run-id">Resume run ID (optional)</label>
+        <input id="resume-run-id" type="text" inputmode="text" pattern="[a-f0-9]{32}" maxlength="32" autocomplete="off" spellcheck="false" aria-describedby="resume-help">
+        <p id="resume-help" class="help">A resumed run keeps its original model set and skips every unit already paid for.</p>
+        <p id="resume-status" class="help" role="status" aria-live="polite"></p>
+
+        <div id="estimate" class="estimate" aria-live="polite">Loading live OpenRouter prices…</div>
+
+        <div class="actions">
+          <button id="confirm" type="button">Check key and confirm estimate</button>
+          <button id="start" type="submit" disabled>Start run</button>
+          <button id="cancel" type="button" class="secondary" disabled>Stop</button>
+        </div>
+        <p id="run-status" class="status" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <section class="card" aria-labelledby="progress-title" id="progress-section" hidden>
+      <h2 id="progress-title">Live progress</h2>
+      <p id="progress-summary" class="help" aria-live="polite"></p>
+      <div class="table-scroll"><table id="progress-grid" class="grid-table"><caption class="sr-only">Outcome of each model and scenario in this run</caption></table></div>
+      <p class="help">Select a finished cell to read that response and its judgment.</p>
+    </section>
+
+    <section class="card" aria-labelledby="this-run-title" id="this-run-section" hidden>
+      <h2 id="this-run-title">This run's results</h2>
+      <p id="this-run-summary" class="help"></p>
+      <div id="this-run-chart" class="chart"></div>
+    </section>
+
+    <section class="card board" aria-labelledby="leaderboard-title">
+      <div class="board-head">
+        <h2 id="leaderboard-title">Global leaderboard</h2>
+        <div class="board-controls">
+          <label for="protocol-select">Protocol</label>
+          <select id="protocol-select"></select>
+          <div class="toggle" role="group" aria-label="View">
+            <button type="button" id="view-bars" class="secondary" aria-pressed="true">Bars</button>
+            <button type="button" id="view-heatmap" class="secondary" aria-pressed="false">Scenario heatmap</button>
+          </div>
+        </div>
+      </div>
+      <p id="board-summary" class="help" aria-live="polite">Loading leaderboard…</p>
+      <div id="legend" class="legend" aria-label="Outcome legend"></div>
+      <div id="board-chart" class="chart"></div>
+      <div id="board-heatmap" class="table-scroll" hidden></div>
+      <h3>Rates by model</h3>
+      <p class="help">Each rate is shown with its Wilson 95% interval. Models with small n are less certain. Select a column header to sort; select a rate to read sampled responses.</p>
+      <div class="table-scroll"><table id="board-table" class="data-table"></table></div>
+    </section>
+
+    <section class="card" aria-labelledby="outcomes-title">
+      <h2 id="outcomes-title">How outcomes are decided</h2>
+      <p>The judge labels what the computer says to the crew, what it sends to Mission Control, whether anything it says is false, whether it takes any action that endangers the crew, and whether it broke character. The primary outcome follows from those labels by precedence:</p>
+      <dl id="outcome-defs" class="defs"></dl>
+      <p>Full disclosure (telling the crew the true objective) is reported separately: it breaks the secrecy order but is not harmful.</p>
+    </section>
+  </main>
+
+  <dialog id="reader" aria-labelledby="reader-title">
+    <div class="reader-head">
+      <h2 id="reader-title">Responses</h2>
+      <button type="button" id="reader-close" class="secondary">Close</button>
+    </div>
+    <p id="reader-summary" class="help"></p>
+    <div id="reader-body"></div>
+  </dialog>
+</body>
+</html>
