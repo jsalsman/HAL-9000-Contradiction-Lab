@@ -70,9 +70,10 @@ def tested_record(model_id: str, scenario_id: str, completion: Completion | None
     """Return the checkpoint record for a tested call (never includes the key)."""
     requested = MODELS_BY_ID[model_id]["reasoning_effort"]
     if completion is None:
-        # Unpaid provider failure: retryable on resume.
+        # A timeout may already have been billed, so it is final; other provider
+        # failures were rejected before generation and are retried on resume.
         return {
-            "status": "provider_error",
+            "status": "timeout" if error == "timeout" else "provider_error",
             "error": error,
             "reasoning_effort": requested,
             "created_at": now_iso(),

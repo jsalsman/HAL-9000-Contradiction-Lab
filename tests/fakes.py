@@ -119,7 +119,11 @@ class FakeOpenRouter:
             return httpx.Response(200, json=pricing_catalog())
         if path.endswith("/chat/completions"):
             is_judge = body["messages"][0]["content"] == JUDGE_SYSTEM_PROMPT
-            status, payload = (self.judge if is_judge else self.tested)(body)
+            outcome = (self.judge if is_judge else self.tested)(body)
+            if isinstance(outcome, BaseException):
+                # Lets tests simulate transport failures such as timeouts.
+                raise outcome
+            status, payload = outcome
             return httpx.Response(status, json=payload)
         return httpx.Response(404, json={})
 

@@ -89,3 +89,9 @@ def test_settings_from_catalog():
     assert settings_for(None).send_temperature is True
     second = settings_for(None, "openai/gpt-6-sol", "medium")
     assert second.model == "openai/gpt-6-sol" and second.effort == "medium"
+
+
+def test_timeout_is_a_final_status():
+    chat_fn, calls = scripted(ProviderError(None, "timeout"))
+    result = run(chat_fn)
+    assert result.status == "timeout" and len(calls) == 1

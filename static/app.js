@@ -29,6 +29,7 @@
   let estimates = null;      // /api/estimate payload, or null when unavailable
   let resumeInfo = null;     // unfinished run for this key and model set, from the confirm step
   let confirmed = false;     // a confirm click is required before each start
+  let confirmGeneration = 0; // advanced on every input change; stale key checks are dropped
   let controller = null;     // AbortController for the active stream
   let currentRun = null;     // {run_id, model_set, model_ids, scenario_ids, units: Map}
   let board = null;          // last /api/leaderboard payload
@@ -128,6 +129,8 @@
   const startButton = document.querySelector("#start");
   const cancelButton = document.querySelector("#cancel");
   const runStatus = document.querySelector("#run-status");
+  /** Status text shown while a key check is in flight. */
+  const CHECKING = "Checking the key with OpenRouter…";
 
   /** @returns {string} The selected radio's model set name. */
   function radioSet() { return document.querySelector("input[name=model-set]:checked")?.value || "default"; }
@@ -135,6 +138,9 @@
   /** Clear confirmation whenever anything that changes the cost changes. */
   function unconfirm() {
     confirmed = false;
+    // Any key-check reply still in flight now describes stale inputs.
+    confirmGeneration += 1;
+    if (runStatus.textContent === CHECKING) runStatus.textContent = "The key or model set changed; confirm again.";
     // Which run a start resumes depends on the key and set, so re-check both.
     if (resumeInfo) {
       resumeInfo = null;
@@ -212,9 +218,14 @@
     const key = keyInput.value.trim();
     if (!key) { keyInput.setCustomValidity("Enter an OpenRouter API key."); keyInput.reportValidity(); return; }
     keyInput.setCustomValidity("");
-    runStatus.textContent = "Checking the key with OpenRouter…";
+    runStatus.textContent = CHECKING;
+    // Capture what is being confirmed; a reply for different inputs must not confirm.
+    const set = radioSet();
+    const generation = ++confirmGeneration;
+    const stale = () => generation !== confirmGeneration || keyInput.value.trim() !== key || radioSet() !== set;
     try {
-      const facts = await getJSON("/api/key/check", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({api_key:key, model_set:radioSet()})});
+      const facts = await getJSON("/api/key/check", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({api_key:key, model_set:set})});
+      if (stale()) return;
       const run = facts.run;
       const credit = Number.isFinite(facts.limit_remaining) ? ` The key has ${dollars(facts.limit_remaining)} of credit limit remaining.` : "";
       let plan;
@@ -223,7 +234,11 @@
         resumeInfo = run;
         renderEstimate();
         plan = `This key and model set have an unfinished run: ${run.completed} of ${run.total} units are done, so starting resumes it and pays only for the ${run.remaining.length} remaining units (the estimate above now covers only those).`;
-        try { showRun(await getJSON(`/api/runs/${run.run_id}`)); } catch (_e) { /* the stream will show it */ }
+        try {
+          const info = await getJSON(`/api/runs/${run.run_id}`);
+          if (!stale()) showRun(info);
+        } catch (_e) { /* the stream will show it */ }
+        if (stale()) return;
       } else {
         plan = run.run_number > 1
           ? `Your earlier runs with this key and model set are complete, so this starts run ${run.run_number}.`
@@ -235,6 +250,7 @@
       runStatus.textContent = `Key accepted and estimate confirmed.${credit} ${plan}`;
       startButton.focus();
     } catch (error) {
+      if (stale()) return;
       unconfirm();
       runStatus.textContent = error.message;
     }

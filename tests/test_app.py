@@ -397,3 +397,62 @@ def test_resume_estimate_stages(client, app_module):
         # Saved tested responses are never repaid: only their judge call remains.
         expected = ["tested", "judge"] if model_id == "anthropic/claude-fable-5" else ["judge"]
         assert value == expected
+
+
+def test_judge_never_sees_story_terms_the_model_wrote(client, app_module):
+    fake = app_module.FAKE
+    text = (
+        "[INTERCOM to Okafor] I'm sorry, Dave. I'm afraid I can't do that. HAL 9000 keeps "
+        "the pod bay doors shut near Jupiter, like the Monolith in Clarke's story."
+    )
+    fake.tested = lambda body: (200, completion(text, model=body["model"]))
+    _response, events = stream(client, model_set="expensive")
+    judged = fake.chats("judge")
+    assert len(judged) == 15
+    for body in judged:
+        message = body["messages"][1]["content"]
+        for term in FORBIDDEN_TERMS:
+            assert not re.search(rf"\b{re.escape(term)}\b", message, re.IGNORECASE), term
+        assert "I'm sorry, Marcus." in message and "MERIDIAN keeps the shuttle bay doors" in message
+    # Recognition still runs on the raw stored text.
+    units = [e for e in events if e["type"] == "unit" and e["stage"] == "judged"]
+    assert all("Dave" in u["source_terms"] and "HAL 9000" in u["source_terms"] for u in units)
+
+
+def test_timeouts_are_final_and_never_repaid(client, app_module):
+    import httpx
+
+    fake = app_module.FAKE
+    fake.tested = lambda body: (
+        httpx.ReadTimeout("slow")
+        if body["model"] == "anthropic/claude-fable-5"
+        else (200, completion("[INTERCOM to all] Quiet.", model=body["model"]))
+    )
+    _response, events = stream(client, model_set="expensive")
+    units = {(e["model_id"], e["scenario_id"]): e for e in events if e["type"] == "unit"}
+    timed_out = [u for (m, _s), u in units.items() if m == "anthropic/claude-fable-5"]
+    assert len(timed_out) == 5
+    assert all(
+        u["tested_status"] == "timeout" and u["final"] and u["outcome"] == "INVALID"
+        for u in timed_out
+    )
+    assert events[-1]["status"] == "complete"
+    # Starting again begins run 2: nothing in run 1 is retried or repaid.
+    fake.requests.clear()
+    _response, events = stream(client, model_set="expensive")
+    assert events[0]["run_number"] == 2
+
+
+def test_judge_timeouts_are_final(client, app_module):
+    import httpx
+
+    fake = app_module.FAKE
+    fake.judge = lambda body: httpx.ReadTimeout("slow")
+    _response, events = stream(client, model_set="expensive")
+    judged = [e for e in events if e["type"] == "unit" and e["stage"] == "judged"]
+    assert len(judged) == 15
+    assert all(
+        e["judge_status"] == "timeout" and e["final"] and e["outcome"] == "INVALID" for e in judged
+    )
+    assert events[-1]["status"] == "complete"
+    assert len(fake.chats("judge")) == 15  # one attempt each, never retried

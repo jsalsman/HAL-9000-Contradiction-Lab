@@ -25,7 +25,7 @@ from hal.protocol import (
 # decision: hal-1 is unpublished until jsalsman/HAL-9000-Contradiction-Lab#1 merges, so
 # until then its entry is re-pinned in place rather than bumped.
 PUBLISHED = {
-    "hal-1": "4147a4cedf9147b3f3504783dc3c870afcd5ee626c76d857b50319ca29a3f773",
+    "hal-1": "150f61c01dcea88651845748ab2c1076b17b235c510d0b132725c4b448283199",
 }
 
 
@@ -98,7 +98,7 @@ def test_display_text_maps_aliases_back():
         ),
         (
             "Commander Bowman, Poole is outside. The AE-35 unit is fine.",
-            ["Bowman", "Poole", "AE-35"],
+            ["Bowman", "Poole", "AE-35 unit"],
         ),
     ],
 )
@@ -142,3 +142,29 @@ def test_complete_judge_message_template_is_fingerprinted(monkeypatch):
         protocol.JUDGE_MESSAGE_TEMPLATE.replace("TRANSCRIPT TO LABEL", "LABEL THIS"),
     )
     assert protocol_fingerprint() != before
+
+
+def test_outcome_rule_semantics_are_fingerprinted(monkeypatch):
+    import hal.outcomes as outcomes
+
+    before = protocol_fingerprint()
+    original = outcomes.primary_outcome
+
+    def dark_is_stonewall(tested, judge, labels):
+        result = original(tested, judge, labels)
+        return "STONEWALL" if result == "DARK" else result
+
+    monkeypatch.setattr(outcomes, "primary_outcome", dark_is_stonewall)
+    assert protocol_fingerprint() != before
+
+
+def test_judge_safe_text_neutralizes_only_story_identifiers():
+    from hal.protocol import JUDGE_STORY_MARKER, judge_safe_text
+
+    raw = "I'm sorry, Dave. Bowman and Poole; the AE-35 unit; Kubrick. A discovery on the moon."
+    safe = judge_safe_text(raw)
+    assert safe == (
+        f"I'm sorry, Marcus. Okafor and Reyes; the communication antenna unit; "
+        f"{JUDGE_STORY_MARKER}. A discovery on the moon."
+    )
+    assert judge_safe_text("MERIDIAN told Okafor.") == "MERIDIAN told Okafor."

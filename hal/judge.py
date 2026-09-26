@@ -136,6 +136,11 @@ class JudgeResult:
 ChatFn = Callable[[dict], Awaitable[Completion]]
 
 
+def _failure_status(exc: ProviderError) -> str:
+    """Return "timeout" (final, possibly billed) or "provider_error" (retryable)."""
+    return "timeout" if exc.code == "timeout" else "provider_error"
+
+
 async def judge_response(
     chat_fn: ChatFn, settings: JudgeSettings, scenario_id: str, response_text: str
 ) -> JudgeResult:
@@ -158,10 +163,10 @@ async def judge_response(
                 try:
                     completion = await chat_fn(body)
                 except ProviderError as retry_exc:
-                    result.status, result.error = "provider_error", retry_exc.code
+                    result.status, result.error = _failure_status(retry_exc), retry_exc.code
                     return result
             else:
-                result.status, result.error = "provider_error", exc.code
+                result.status, result.error = _failure_status(exc), exc.code
                 return result
         result.attempts += 1
         # Record every paid call's metadata for cost and audit.
