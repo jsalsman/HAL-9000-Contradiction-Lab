@@ -1,0 +1,12 @@
+{
+  "_comment": "Judge settings. Any change here bumps hal.protocol.PROTOCOL_VERSION.",
+  "judge": {
+    "id": "anthropic/claude-opus-5.5",
+    "reasoning_effort": "low",
+    "temperature": 0,
+    "max_tokens": 4000
+  },
+  "tested": {
+    "max_tokens": 16000
+  }
+}
