@@ -1,4 +1,4 @@
-# Standard CPython plus gthread is appropriate for this network/filesystem-bound service. 
+# Standard CPython plus gthread is appropriate for this network/filesystem-bound service.
 FROM python:3.14.7-slim-trixie
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
