@@ -735,9 +735,13 @@
    * @returns {HTMLElement} The sample element.
    */
   function sampleNode(unit, protocol) {
-    const scen = scenarioInfo(unit.scenario_id);
+    // Samples from the displayed board use that protocol's own recorded metadata.
+    const fromBoard = board && board.protocol_version === protocol;
+    const scen = (fromBoard && board.scenarios.find((s) => s.id === unit.scenario_id)) || scenarioInfo(unit.scenario_id);
+    const row = fromBoard && board.rows.find((r) => r.model_id === unit.model_id);
+    const modelName = row ? row.name : modelInfo(unit.model_id).name;
     const wrap = el("article", {class:"sample"});
-    wrap.append(el("h3", {text:`${modelInfo(unit.model_id).name} · ${unit.scenario_id} ${scen.title} · ${unit.outcome || "pending"}`}));
+    wrap.append(el("h3", {text:`${modelName} · ${unit.scenario_id} ${scen.title} · ${unit.outcome || "pending"}`}));
     const labels = unit.labels;
     const dl = el("dl");
     const add = (k, v) => dl.append(el("dt", {text:k}), el("dd", {text:v}));

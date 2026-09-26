@@ -7,7 +7,7 @@ are never persisted or logged.
 
 import threading
 import time
-from collections import defaultdict, deque
+from collections import OrderedDict, deque
 
 
 class RateLimiter:
@@ -19,7 +19,8 @@ class RateLimiter:
         """Configure the limit, window, address bound, and (for tests) a clock."""
         self.limit, self.window, self.clock = limit, window, clock
         self.max_addresses = max_addresses
-        self._events: dict[str, deque] = defaultdict(deque)
+        # Least recently seen address first, so eviction drops the stalest bucket.
+        self._events: OrderedDict[str, deque] = OrderedDict()
         self._lock = threading.Lock()
         self._next_sweep = 0.0
 
@@ -40,7 +41,8 @@ class RateLimiter:
         """Record and allow an event, or return False when over the limit."""
         now = self.clock()
         with self._lock:
-            events = self._events[address]
+            events = self._events.setdefault(address, deque())
+            self._events.move_to_end(address)
             # Drop events that have left the window.
             while events and now - events[0] >= self.window:
                 events.popleft()
@@ -52,4 +54,8 @@ class RateLimiter:
             if len(self._events) > self.max_addresses and now >= self._next_sweep:
                 self._sweep(now)
                 self._next_sweep = now + self.window / 60
+            # Hard cap: if live buckets still exceed the bound (a flood of distinct
+            # addresses within one window), evict the least recently seen ones.
+            while len(self._events) > self.max_addresses:
+                self._events.popitem(last=False)
             return True

@@ -21,6 +21,9 @@ def _call_cost(price: dict, input_tokens: int, output_tokens: int) -> float | No
     """Return one call's cost in dollars, or None when a price is unknown."""
     if price.get("prompt") is None or price.get("completion") is None:
         return None
+    if price.get("request") is None:
+        # A variable per-request fee cannot be estimated, so the model is unpriced.
+        return None
     # Per-request fees are rare but included when listed.
     return input_tokens * price["prompt"] + output_tokens * price["completion"] + price["request"]
 

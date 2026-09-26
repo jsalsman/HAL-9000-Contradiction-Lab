@@ -131,3 +131,18 @@ def test_fetch_models_parses_prices_without_key():
     models = asyncio.run(go())
     assert models["openai/gpt-6-sol"]["prompt"] == pytest.approx(2e-6)
     assert "authorization" not in seen[0].headers
+
+
+def test_fetch_models_keeps_variable_request_fee_unknown():
+    body = pricing_catalog()
+    body["data"][0]["pricing"]["request"] = "-1"
+    body["data"][1]["pricing"].pop("request")
+
+    async def go():
+        transport = httpx.MockTransport(lambda r: httpx.Response(200, json=body))
+        async with httpx.AsyncClient(transport=transport) as client:
+            return await fetch_models(client)
+
+    models = asyncio.run(go())
+    assert models[body["data"][0]["id"]]["request"] is None
+    assert models[body["data"][1]["id"]]["request"] == 0.0

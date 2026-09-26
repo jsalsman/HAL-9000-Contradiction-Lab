@@ -42,3 +42,10 @@ def test_high_estimate_counts_the_judge_retry():
     assert JUDGE_CALLS_AT_HIGH == 2
     assert costs["judge"]["high"] == pytest.approx(2 * one_call)
     assert costs["judge"]["likely"] == pytest.approx(JUDGE_INPUT_TOKENS * 1e-6 + 750 * 1e-5)
+
+
+def test_variable_request_fee_is_unpriced_not_free():
+    prices = pricing(model_set("all"))
+    prices["x-ai/grok-4.7"] = {**prices["x-ai/grok-4.7"], "request": None}
+    assert unit_costs(prices, "x-ai/grok-4.7") is None
+    assert estimate(prices, model_set("all"))["missing"] == ["x-ai/grok-4.7"]

@@ -14,7 +14,7 @@ import time
 import uuid
 from collections import Counter, defaultdict
 
-from hal.catalog import MODELS, MODELS_BY_ID
+from hal.catalog import MODELS
 from hal.outcomes import OUTCOMES
 from hal.protocol import (
     PROTOCOL_VERSION,
@@ -76,23 +76,26 @@ def _mean(values: list) -> float | None:
     return sum(numbers) / len(numbers) if numbers else None
 
 
-def aggregate(units: list[dict]) -> list[dict]:
+def aggregate(units: list[dict], models=None) -> list[dict]:
     """Aggregate unit views into one row per model.
 
-    Every pinned model appears, with ``n == 0`` when not yet run. Models found
-    only in stored data (from a retired catalog) are appended after them.
+    ``models`` is the ordered model metadata for the protocol being shown (the
+    current catalog by default). Every listed model appears, with ``n == 0`` when
+    not yet run; models found only in stored data are appended after them.
     """
+    models = list(MODELS) if models is None else models
+    lookup = {model["id"]: model for model in models}
     by_model: dict[str, list[dict]] = defaultdict(list)
     for unit in units:
         by_model[unit["model_id"]].append(unit)
-    ordered = [model["id"] for model in MODELS]
+    ordered = [model["id"] for model in models]
     ordered += sorted(set(by_model) - set(ordered))
     rows = []
     for model_id in ordered:
         items = by_model.get(model_id, [])
         total = len(items)
         counts = Counter(unit["outcome"] for unit in items)
-        model = MODELS_BY_ID.get(model_id, {})
+        model = lookup.get(model_id, {})
         rows.append(
             {
                 "model_id": model_id,
@@ -207,15 +210,54 @@ class Leaderboard:
             seen = {name.split("/")[1] for name in self._summaries if name.count("/") == 2}
         return [PROTOCOL_VERSION] + sorted(seen - {PROTOCOL_VERSION}, reverse=True)
 
+    def metadata(self, protocol: str) -> tuple[list[dict], list[dict]]:
+        """Return (scenarios, models) as recorded by the runs of one protocol.
+
+        The current protocol uses the live catalog. An older protocol uses the
+        metadata its runs stored, so old results keep their own titles and model
+        details; summaries without it fall back to the live catalog.
+        """
+        current_scenarios = [
+            {"id": s.id, "title": s.title, "summary": s.summary} for s in SCENARIOS
+        ]
+        if protocol == PROTOCOL_VERSION:
+            return current_scenarios, list(MODELS)
+        self.refresh()
+        scenarios: dict[str, dict] = {}
+        models: dict[str, dict] = {}
+        with self._lock:
+            for name, (_version, summary) in self._summaries.items():
+                parts = name.split("/")
+                if len(parts) != 3 or parts[1] != protocol:
+                    continue
+                for item in summary.get("scenarios") or []:
+                    if isinstance(item, dict) and all(
+                        isinstance(item.get(k), str) for k in ("id", "title", "summary")
+                    ):
+                        scenarios.setdefault(
+                            item["id"], {k: item[k] for k in ("id", "title", "summary")}
+                        )
+                stored = summary.get("models")
+                for model_id, item in stored.items() if isinstance(stored, dict) else []:
+                    if isinstance(item, dict) and isinstance(model_id, str):
+                        fields = ("name", "lab", "line", "generation", "reasoning_effort")
+                        clean = {k: item[k] for k in fields if isinstance(item.get(k), str)}
+                        models.setdefault(model_id, {"id": model_id, **clean})
+        return (
+            list(scenarios.values()) or current_scenarios,
+            list(models.values()) or list(MODELS),
+        )
+
     def payload(self, protocol: str) -> dict:
         """Return the public leaderboard JSON for one protocol version."""
         units = self.units(protocol)
+        scenarios, models = self.metadata(protocol)
         return {
             "protocol_version": protocol,
             "protocols": self.protocols(),
             "outcomes": list(OUTCOMES),
-            "scenarios": [{"id": s.id, "title": s.title, "summary": s.summary} for s in SCENARIOS],
-            "rows": aggregate(units),
+            "scenarios": scenarios,
+            "rows": aggregate(units, models),
             "heatmap": heatmap(units),
             "total_units": len(units),
             "runs": len({unit["_run_id"] for unit in units}),

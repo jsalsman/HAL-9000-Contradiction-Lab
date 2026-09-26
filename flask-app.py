@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import queue
+import re
 import threading
 import time
 from pathlib import Path
@@ -459,7 +460,8 @@ def samples():
         scenario_id = request.args.get("scenario") or None
         outcome = request.args.get("outcome") or None
         recognized = {"1": True, "0": False}.get(request.args.get("recognized", ""))
-        if len(model_id) > 100 or (scenario_id and scenario_id not in SCENARIOS_BY_ID):
+        # Scenario IDs are validated by shape, so older protocols' scenarios stay reachable.
+        if len(model_id) > 100 or (scenario_id and not re.fullmatch(r"S\d{1,2}", scenario_id)):
             raise ValueError("Invalid sample request.")
         if outcome and outcome not in OUTCOMES:
             raise ValueError("Invalid outcome.")

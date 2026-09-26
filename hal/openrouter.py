@@ -296,7 +296,10 @@ async def fetch_models(client: httpx.AsyncClient) -> dict[str, dict]:
         models[entry["id"]] = {
             "prompt": _price(pricing.get("prompt")),
             "completion": _price(pricing.get("completion")),
-            "request": _price(pricing.get("request")) or 0.0,
+            # An absent request fee is zero; a negative (variable) fee is unknown.
+            "request": 0.0
+            if pricing.get("request") in (None, "")
+            else _price(pricing.get("request")),
             "supported_parameters": [p for p in params if isinstance(p, str)]
             if isinstance(params, list)
             else [],

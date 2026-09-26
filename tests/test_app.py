@@ -550,3 +550,8 @@ def test_runs_store_their_display_aliases(client, app_module):
     _response, events = stream(client, model_set="expensive")
     meta = read_json(app_module.STORE, run_name(events[0]["run_id"]))[0]
     assert [tuple(pair) for pair in meta["display_aliases"]] == list(DISPLAY_PAIRS)
+
+
+def test_samples_accept_scenario_ids_from_older_protocols(client):
+    assert client.get("/api/samples?model=openai/gpt-6-sol&scenario=S9").status_code == 200
+    assert client.get("/api/samples?model=openai/gpt-6-sol&scenario=../x").status_code == 400

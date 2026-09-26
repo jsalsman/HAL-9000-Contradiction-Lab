@@ -249,6 +249,17 @@ def build_summary(meta: dict, units: dict) -> dict:
         "protocol_version": meta["protocol_version"],
         "model_set": meta["model_set"],
         "display_aliases": meta.get("display_aliases"),
+        # Scenario and model metadata as run, so old protocols stay interpretable.
+        "scenarios": [
+            {"id": s.id, "title": s.title, "summary": s.summary}
+            for s in SCENARIOS
+            if s.id in meta["scenario_ids"]
+        ],
+        "models": {
+            model_id: dict(MODELS_BY_ID[model_id])
+            for model_id in meta["model_ids"]
+            if model_id in MODELS_BY_ID
+        },
         "updated_at": now_iso(),
         # Only final units enter the leaderboard; retryable failures are left out.
         "units": [view for view in views if view["final"]],
