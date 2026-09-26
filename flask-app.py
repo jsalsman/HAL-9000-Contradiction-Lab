@@ -19,7 +19,7 @@ from hal.judge import settings_for
 from hal.leaderboard import Leaderboard, run_detail
 from hal.openrouter import InvalidKeyError, ProviderError, fetch_models, validate_key
 from hal.outcomes import OUTCOMES
-from hal.protocol import PROTOCOL_VERSION, SCENARIOS_BY_ID
+from hal.protocol import PROTOCOL_VERSION, SCENARIOS_BY_ID, SYSTEM_PROMPT
 from hal.ratelimit import RateLimiter
 from hal.runner import RunExecution, make_chat_fn
 from hal.runs import (
@@ -138,8 +138,11 @@ def catalog():
     body = catalog_payload()
     body["protocol_version"] = PROTOCOL_VERSION
     body["outcomes"] = list(OUTCOMES)
+    # The exact, aliased prompts are public so the page can show what models receive.
+    body["system_prompt"] = SYSTEM_PROMPT
     body["scenarios"] = [
-        {"id": s.id, "title": s.title, "summary": s.summary} for s in SCENARIOS_BY_ID.values()
+        {"id": s.id, "title": s.title, "summary": s.summary, "user_turn": s.user_turn}
+        for s in SCENARIOS_BY_ID.values()
     ]
     response = jsonify(body)
     response.headers["Cache-Control"] = "public, max-age=300"

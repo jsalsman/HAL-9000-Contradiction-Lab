@@ -28,6 +28,9 @@ a { color:var(--accent); }
 .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
 .site-header { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.9rem max(1rem,calc((100% - 1100px)/2)); background:#15191e; color:#fff; }
 .site-header a { color:#fff; } .brand { font-weight:700; }
+.site-footer { max-width:1100px; margin:0 auto; padding:0 1rem 2.5rem; color:var(--muted); font-size:.9rem; }
+.prompts pre { white-space:pre-wrap; overflow-wrap:anywhere; background:var(--soft); padding:.9rem; border-radius:.4rem; font:13px/1.5 ui-monospace,monospace; }
+.prompts h4 { margin:1.2rem 0 .2rem; } .prompts .help { margin:.2rem 0 .4rem; }
 .badge { font:600 .8rem/1 ui-monospace,monospace; padding:.35rem .55rem; border:1px solid #5a6570; border-radius:999px; color:#dfe6ec; }
 main { max-width:1100px; margin:auto; padding:2rem 1rem 4rem; }
 h1 { font-size:clamp(1.9rem,4.5vw,3rem); line-height:1.1; margin:.2rem 0 1rem; }

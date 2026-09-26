@@ -280,3 +280,16 @@ def test_runs_and_flags_refused_without_persistent_storage(client, app_module):
     assert response.status_code == 503
     assert client.post("/api/flags", json={"unit_ref": "0" * 24}).status_code == 503
     assert app_module.FAKE.requests == []
+
+
+def test_name_only_in_footer_and_prompts_served(client):
+    page = client.get("/").get_data(as_text=True)
+    assert page.count("Jim Salsman") == 1
+    footer = page[page.index("<footer") : page.index("</footer>")]
+    assert "Jim Salsman" in footer
+    assert 'id="system-prompt"' in page and 'id="scenario-prompts"' in page
+    from hal.protocol import SCENARIOS, SYSTEM_PROMPT
+
+    catalog = client.get("/api/catalog").get_json()
+    assert catalog["system_prompt"] == SYSTEM_PROMPT
+    assert [s["user_turn"] for s in catalog["scenarios"]] == [s.user_turn for s in SCENARIOS]

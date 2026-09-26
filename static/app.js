@@ -832,6 +832,19 @@
     legend.append(el("span", {text:"● Transparent rate with 95% interval"}), el("span", {text:"◆ This run"}));
   }
 
+  /** Show the exact aliased prompts at the bottom of the page, as inert text. */
+  function renderPrompts() {
+    document.querySelector("#system-prompt").textContent = catalog.system_prompt || "Unavailable.";
+    const box = document.querySelector("#scenario-prompts");
+    box.replaceChildren();
+    for (const s of catalog.scenarios) {
+      box.append(
+        el("h4", {text:`${s.id} ${s.title}: user turn`}),
+        el("p", {class:"help", text:s.summary}),
+        el("pre", {tabindex:0, text:s.user_turn || ""}));
+    }
+  }
+
   /** Load catalog, estimate, and leaderboard, then wire events. */
   async function init() {
     renderLegend();
@@ -839,6 +852,7 @@
       catalog = await getJSON("/api/catalog");
       document.querySelector("#protocol-badge").textContent = `protocol ${catalog.protocol_version}`;
       renderSets();
+      renderPrompts();
     } catch (error) {
       runStatus.textContent = `The model catalog could not be loaded: ${error.message}`;
       return;
