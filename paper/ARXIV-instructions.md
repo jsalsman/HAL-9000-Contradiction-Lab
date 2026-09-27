@@ -15,13 +15,25 @@ This writes two files, both ignored by git:
 - `paper/arxiv-upload.tar.gz`, the file to upload.
 - `paper/arxiv-preview.pdf`, the preprint compiled from an unpacked copy of that tarball with `pdflatex`, `biber`, `pdflatex`, `pdflatex`, the same steps arXiv runs. Check it before uploading.
 
-It needs the same TeX Live packages as the JAIR build (listed in `JAIR-instructions.md`).
+The preview needs TeX Live and biber. The script first removes any tarball or preview left from an earlier run, then checks for `pdflatex`, `biber`, and the packages most often missing, and it test-builds the upload before writing anything into `paper/`. If a tool or any LaTeX file is missing, it names what is missing, prints the install command, and leaves no tarball or preview behind. On Debian or Ubuntu (including GitHub Codespaces), that is:
+
+```sh
+sudo apt-get update
+sudo apt-get install -y --no-install-recommends \
+  texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended \
+  texlive-fonts-extra texlive-pictures texlive-bibtex-extra texlive-plain-generic biber
+```
+
+`texlive-fonts-extra` is large (about a gigabyte) but is the package that provides the Libertine fonts the template requires. Ubuntu 24.04 ships TeX Live 2023, the version pinned for arXiv; check yours with `pdflatex --version`.
+
+Without TeX, `paper/arxiv-tarball.sh --no-preview` writes only the tarball (and removes any old preview, so it cannot be mistaken for one of the new tarball). That is enough to upload, but then arXiv's own processed PDF is the only check; step 3 below says what to look for.
 
 ## What the tarball contains
 
 | File | Why it is there |
 |---|---|
-| `hal-contradiction-lab.tex` | The paper, with its bibliography embedded (written out as `hal-contradiction-lab.bib` during the build) |
+| `hal-contradiction-lab.tex` | The paper, with its bibliography embedded |
+| `hal-contradiction-lab.bib` | That bibliography extracted by the script, because arXiv's upload scan requires the `.bib` file named in `\addbibresource` (the build rewrites it with identical content) |
 | `jair.cls` | The JAIR class the paper is set in |
 | `acmart.cls` | The acmart v2.12 class that `jair.cls` extends |
 | `acmart.dtx`, `acmart.ins` | acmart's source, which its license requires to accompany the generated `acmart.cls`; not compiled |
@@ -35,7 +47,7 @@ Do not add a `.bbl` file: arXiv runs biber itself, and a `.bbl` from a different
 
 1. Log in at https://arxiv.org and choose "Start a new submission".
 2. Upload `paper/arxiv-upload.tar.gz` as one file; arXiv unpacks it. On the file review page, `hal-contradiction-lab.tex` should be the top-level file.
-3. Process the submission and compare arXiv's PDF with `paper/arxiv-preview.pdf`. They should match apart from arXiv's side stamp.
+3. Process the submission and check arXiv's PDF. If you built a preview, compare the two: they should match apart from arXiv's side stamp. If you used `--no-preview`, read arXiv's PDF itself: 16 pages; the title, author, and structured abstract on the first page with "Preprint." in the footer and no line numbers; three figures and six tables; every citation resolved (no bold citation keys or question marks); and the reference list followed by Appendices A to E, with no reproducibility checklist.
 4. Categories: primary cs.CL (Computation and Language); cross-list cs.AI (Artificial Intelligence) and cs.CY (Computers and Society).
 5. License: CC BY 4.0, which matches the license notice printed in the paper.
 6. Metadata:
