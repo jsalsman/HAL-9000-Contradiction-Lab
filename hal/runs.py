@@ -216,6 +216,40 @@ def tested_latency(tested: dict | None) -> float | None:
     return value if ok else None
 
 
+def _known_cost(value) -> bool:
+    """Return whether a reported cost is a real, non-negative number."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0
+
+
+def cost_complete(entry: dict) -> bool:
+    """Return whether every paid call of a final unit reported its cost.
+
+    A refusal sent in place of a reply reports no usage and is not billed, so its
+    missing cost is a known zero. Any other missing charge (a timeout, which may
+    have been billed, or a paid call whose usage lacked a cost) leaves the unit's
+    total unknown, so an observed mean must not use it.
+    """
+    tested, judge = entry.get("tested") or {}, entry.get("judge") or {}
+    status = tested.get("status")
+    if status in (None, "timeout", "provider_error"):
+        return False
+    if not _known_cost((tested.get("usage") or {}).get("cost")) and status != "refused":
+        return False
+    if status != "ok":
+        # No judge call is made for a response that was not ok.
+        return True
+    if judge.get("status") in (None, "timeout", "provider_error"):
+        return False
+    # Every paid judge call is recorded with its usage, including a retried one.
+    calls = judge.get("calls")
+    if not isinstance(calls, list) or not calls:
+        return False
+    return all(
+        isinstance(call, dict) and _known_cost((call.get("usage") or {}).get("cost"))
+        for call in calls
+    )
+
+
 def unit_view(run_id: str, model_id: str, scenario_id: str, entry: dict) -> dict:
     """Return the compact, text-free record of one unit for summaries and the grid."""
     tested, judge = entry.get("tested") or {}, entry.get("judge") or {}
@@ -242,6 +276,8 @@ def unit_view(run_id: str, model_id: str, scenario_id: str, entry: dict) -> dict
         # Wall-clock seconds of the tested call, retries included; the judge is not timed.
         "latency_seconds": tested_latency(tested),
         "cost_usd": round(sum(costs), 8) if costs else None,
+        # Whether cost_usd covers every paid call; observed means use only these.
+        "cost_complete": cost_complete(entry),
         "final": unit_final(entry),
         "updated_at": judge.get("created_at") or tested.get("created_at"),
     }

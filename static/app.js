@@ -163,59 +163,59 @@
     startButton.textContent = resumeInfo ? "Resume run" : "Start run";
   }
 
-  /** Render the cost estimate for the selected set, or for a resumed run's remaining units. */
+  /**
+   * Show each model set's observed cost under its radio button, and a note for a
+   * resumed run, for models priced from live rates, or for missing prices.
+   * @returns {boolean} Whether the selected set (or resume) is fully priced.
+   */
   function renderEstimate() {
     const box = document.querySelector("#estimate");
-    box.replaceChildren();
+    const selected = radioSet();
+    for (const cell of document.querySelectorAll("[id^=cost-]")) {
+      const name = cell.id.slice("cost-".length);
+      const set = estimates?.sets?.[name];
+      cell.textContent = set && !set.missing.length ? dollars(set.total) : "–";
+      cell.classList.toggle("selected", name === selected);
+    }
+    const notes = [];
+    let priced = false;
     if (!estimates) {
-      box.append(el("p", {class:"error", text:"Live OpenRouter prices are unavailable, so no estimate can be shown and a run cannot be confirmed. Reload to try again."}));
+      notes.push(el("p", {class:"error", text:"Costs are unavailable right now, so a run cannot be confirmed. Reload to try again."}));
       confirmButton.disabled = true;
-      return;
-    }
-    confirmButton.disabled = Boolean(controller);
-    let units, totals, missing;
-    if (resumeInfo) {
-      // Sum costs over exactly the stages the resume still pays for: a unit whose
-      // tested response is already saved needs only its judge call.
-      units = resumeInfo.remaining.length;
-      totals = {tested:{low:0, likely:0, high:0}, judge:{low:0, likely:0, high:0}, total:{low:0, likely:0, high:0}};
-      missing = [];
-      for (const unit of resumeInfo.remaining) {
-        const costs = estimates.per_model[unit.model_id];
-        if (!costs) { missing.push(unit.model_id); continue; }
-        const stages = Array.isArray(unit.stages) ? unit.stages : ["tested", "judge"];
-        for (const level of ["low", "likely", "high"]) {
-          const tested = stages.includes("tested") ? costs.tested[level] : 0;
-          const judge = stages.includes("judge") ? costs.judge[level] : 0;
-          totals.tested[level] += tested;
-          totals.judge[level] += judge;
-          totals.total[level] += tested + judge;
-        }
-      }
     } else {
-      const set = estimates.sets[radioSet()];
-      ({units, totals, missing} = set);
+      confirmButton.disabled = Boolean(controller);
+      const set = estimates.sets[selected];
+      let missing = set.missing;
+      if (resumeInfo) {
+        // Sum over exactly the stages the resume still pays for: a unit whose tested
+        // response is already saved needs only its judge call.
+        let total = 0;
+        missing = [];
+        for (const unit of resumeInfo.remaining) {
+          const costs = estimates.per_model[unit.model_id];
+          const stages = Array.isArray(unit.stages) ? unit.stages : ["tested", "judge"];
+          // A judge-only stage needs the live judge price; never guess it from the blended mean.
+          const cost = costs ? (stages.includes("tested") ? costs.unit : costs.judge) : null;
+          if (!Number.isFinite(cost)) { if (!missing.includes(unit.model_id)) missing.push(unit.model_id); continue; }
+          total += cost;
+        }
+        const count = resumeInfo.remaining.length;
+        // A partial sum would read as a real price, so show none when anything is unpriced.
+        notes.push(el("p", {}, el("strong", {text:`Resuming: ${missing.length ? "not yet priced" : dollars(total)}`}),
+          ` for the ${count} remaining unit${count === 1 ? "" : "s"}.`));
+      }
+      if (set.estimated.length) {
+        notes.push(el("p", {class:"help", text:`Not yet run, so priced from live OpenRouter rates: ${set.estimated.map((id) => modelInfo(id).name).join(", ")}.`}));
+      }
+      if (missing.length) {
+        notes.push(el("p", {class:"error", text:`No observed cost or live price for: ${missing.join(", ")}. The run cannot be confirmed until OpenRouter lists a price.`}));
+        confirmButton.disabled = true;
+      }
+      priced = missing.length === 0;
     }
-    const a = estimates.assumptions;
-    box.append(el("p", {}, el("strong", {text:`Estimated cost for ${units} unit${units === 1 ? "" : "s"}`}),
-      ` (each unit is one tested call and one judge call, priced from live OpenRouter rates):`));
-    const table = el("table", {},
-      el("thead", {}, el("tr", {}, el("th", {scope:"col", text:""}), el("th", {scope:"col", text:"Low"}), el("th", {scope:"col", text:"Likely"}), el("th", {scope:"col", text:"High"}))));
-    const body = el("tbody");
-    for (const [label, part] of [["Tested models", "tested"], ["Judge", "judge"], ["Total", "total"]]) {
-      body.append(el("tr", {}, el("th", {scope:"row", text:label}),
-        ...["low", "likely", "high"].map((level) => el("td", {text:dollars(totals[part][level])}))));
-    }
-    table.append(body);
-    box.append(table);
-    box.append(el("p", {class:"help", text:
-      `Assumptions per call. Tested: about ${a.tested.input.toLocaleString()} input tokens and ${a.tested.output.low.toLocaleString()} / ${a.tested.output.likely.toLocaleString()} / ${a.tested.output.high.toLocaleString()} output tokens including reasoning. ` +
-      `Judge (${modelInfo(estimates.judge_id).name}, low effort): about ${a.judge.input.toLocaleString()} input and ${a.judge.output.low} / ${a.judge.output.likely} / ${a.judge.output.high} output tokens; the high figure also counts the judge's one allowed retry (${a.judge.calls_at_high} calls). ` +
-      "Actual costs vary with reasoning length and provider routing; the page records OpenRouter's reported cost for every call."}));
-    if (missing.length) {
-      box.append(el("p", {class:"error", text:`No live price for: ${missing.join(", ")}. The run cannot be confirmed until OpenRouter lists a price.`}));
-      confirmButton.disabled = true;
-    }
+    box.replaceChildren(...notes);
+    box.hidden = notes.length === 0;
+    return priced;
   }
 
   /** Label the radio buttons from the catalog so counts always match the pinned models. */
@@ -245,8 +245,12 @@
       if (run.resuming) {
         // The run is identified by this key and set, so starting picks it up where it stopped.
         resumeInfo = run;
-        renderEstimate();
-        plan = `This key and model set have an unfinished run: ${run.completed} of ${run.total} units are done, so starting resumes it and pays only for the ${run.remaining.length} remaining units (the estimate above now covers only those).`;
+        if (!renderEstimate()) {
+          // The resume needs a price the page does not have; never enable the run.
+          runStatus.textContent = "This run cannot be resumed until its remaining units are priced; see the note above.";
+          return;
+        }
+        plan = `This key and model set have an unfinished run: ${run.completed} of ${run.total} units are done, so starting resumes it and pays only for the ${run.remaining.length} remaining units (the cost shown above now covers only those).`;
         try {
           const info = await getJSON(`/api/runs/${run.run_id}`);
           if (!stale()) showRun(info);
@@ -260,7 +264,7 @@
       confirmed = true;
       startButton.disabled = false;
       startButton.textContent = run.resuming ? "Resume run" : "Start run";
-      runStatus.textContent = `Key accepted and estimate confirmed.${credit} ${plan}`;
+      runStatus.textContent = `Key accepted and cost confirmed.${credit} ${plan}`;
       startButton.focus();
     } catch (error) {
       if (stale()) return;
@@ -286,7 +290,7 @@
    */
   async function startRun(event) {
     event.preventDefault();
-    if (!confirmed) { runStatus.textContent = "Confirm the estimate first."; return; }
+    if (!confirmed) { runStatus.textContent = "Confirm the cost first."; return; }
     // The server finds the run from the key and model set; no run ID is sent.
     const body = {api_key:keyInput.value.trim(), confirm:true, model_set:radioSet()};
     controller = new AbortController();
@@ -309,6 +313,7 @@
       if (currentRun) {
         await refreshRun(currentRun.run_id);
         loadBoard();
+        loadCosts();
       }
     }
   }
@@ -597,19 +602,21 @@
 
   /* ------------------------------------------------------------------ leaderboard */
 
-  /** Fetch and render the leaderboard for the selected protocol. */
+  /** Fetch the per-set costs, which change as runs finish, and show them. */
+  async function loadCosts() {
+    try { estimates = await getJSON("/api/estimate"); } catch (_e) { estimates = null; }
+    renderEstimate();
+  }
+
+  /** Fetch and render the leaderboard for the current protocol. */
   async function loadBoard() {
-    const select = document.querySelector("#protocol-select");
-    const protocol = select.value || catalog?.protocol_version || "";
+    const protocol = catalog?.protocol_version || "";
     try {
       board = await getJSON(`/api/leaderboard?protocol=${encodeURIComponent(protocol)}`);
     } catch (error) {
       document.querySelector("#board-summary").textContent = error.message;
       return;
     }
-    const chosen = board.protocol_version;
-    select.replaceChildren(...board.protocols.map((p) => el("option", {value:p, text:p === catalog?.protocol_version ? `${p} (current)` : p})));
-    select.value = chosen;
     renderBoard();
   }
 
@@ -617,8 +624,8 @@
   function renderBoard() {
     const sameProtocol = currentRun && currentRun.protocol === board.protocol_version;
     document.querySelector("#board-summary").textContent =
-      `${board.total_units} judged units from ${board.runs} run${board.runs === 1 ? "" : "s"} under protocol ${board.protocol_version}. ` +
-      "Versions are never mixed." + (sameProtocol ? " Diamonds and shaded rows mark this run's models." : "");
+      `${board.total_units} judged units from ${board.runs} run${board.runs === 1 ? "" : "s"} under protocol ${board.protocol_version}.` +
+      (sameProtocol ? " Diamonds and shaded rows mark this run's models." : "");
     let marks = null;
     if (sameProtocol) {
       marks = new Map();
@@ -942,7 +949,6 @@
     renderLegend();
     try {
       catalog = await getJSON("/api/catalog");
-      document.querySelector("#protocol-badge").textContent = `protocol ${catalog.protocol_version}`;
       renderSets();
       renderPrompts();
     } catch (error) {
@@ -950,8 +956,7 @@
       return;
     }
     loadBoard();
-    try { estimates = await getJSON("/api/estimate"); } catch (_e) { estimates = null; }
-    renderEstimate();
+    loadCosts();
   }
 
   document.querySelector("#run-form").addEventListener("submit", startRun);
@@ -961,7 +966,6 @@
   for (const radio of document.querySelectorAll("input[name=model-set]")) {
     radio.addEventListener("change", () => { unconfirm(); renderEstimate(); });
   }
-  document.querySelector("#protocol-select").addEventListener("change", loadBoard);
   document.querySelector("#view-bars").addEventListener("click", () => setView(false));
   document.querySelector("#view-heatmap").addEventListener("click", () => setView(true));
   document.querySelector("#reader-close").addEventListener("click", () => dialog.close());

@@ -15,7 +15,7 @@ from flask import Flask, Response, jsonify, request, send_file, stream_with_cont
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from hal.catalog import MODEL_SET_ORDER, catalog_payload, model_set
-from hal.cost import assumptions, estimate
+from hal.cost import model_costs, observed_costs, set_cost
 from hal.judge import settings_for
 from hal.leaderboard import Leaderboard, run_detail
 from hal.openrouter import InvalidKeyError, ProviderError, fetch_models, validate_key
@@ -155,16 +155,18 @@ def catalog():
 
 @app.get("/api/estimate")
 def cost_estimate():
-    """Return per-unit and per-set cost estimates from live OpenRouter pricing."""
+    """Return each model set's cost: observed from past runs, else estimated from live prices."""
+    try:
+        observed = observed_costs(LEADERBOARD.units(PROTOCOL_VERSION))
+    except StorageError:
+        observed = {}
     pricing = live_pricing()
-    if not pricing:
+    if not observed and not pricing:
         return jsonify(error="Live OpenRouter pricing is unavailable. Try again shortly."), 503
-    all_models = model_set("all")
+    per_model = model_costs(pricing, observed, model_set("all"))
     return jsonify(
-        assumptions=assumptions(),
-        per_model=estimate(pricing, all_models)["per_model"],
-        sets={name: estimate(pricing, model_set(name)) for name in MODEL_SET_ORDER},
-        judge_id=settings_for(pricing).model,
+        per_model=per_model,
+        sets={name: set_cost(per_model, model_set(name)) for name in MODEL_SET_ORDER},
     )
 
 

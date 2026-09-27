@@ -43,22 +43,18 @@
 .stars i:nth-child(13) { top:3%; left:62%; animation-delay:3.1s; animation-duration:6s; }
 .stars i:nth-child(14) { top:9%; left:34%; animation-delay:1.6s; }
 @keyframes twinkle { 0%,100% { opacity:.2; transform:scale(1); } 50% { opacity:.95; transform:scale(1.35); } }
-.site-header,main,.site-footer { position:relative; z-index:1; }
+main,.site-footer { position:relative; z-index:1; }
 
 body { margin:0; background:radial-gradient(ellipse at 80% -10%,#122038 0,transparent 55%),var(--paper); background-attachment:fixed; color:var(--ink); font:16px/1.55 var(--display); }
 a { color:var(--accent); }
 .skip { position:absolute; left:-999px; top:0; } .skip:focus { left:1rem; z-index:5; background:var(--panel); padding:.5rem; }
 .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
-.site-header { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.9rem max(1rem,calc((100% - 1100px)/2)); background:#000; color:var(--header); border-bottom:1px solid var(--line); }
-.site-header a { color:var(--header); text-decoration:none; } .site-header a:hover { text-decoration:underline; }
-.brand { font-weight:800; letter-spacing:.01em; font-size:1.1rem; }
 .site-footer { max-width:1100px; margin:0 auto; padding:0 1rem 2.5rem; color:var(--muted); font-size:.9rem; }
 .prompts pre { white-space:pre-wrap; overflow-wrap:anywhere; background:var(--soft); padding:.9rem; border-radius:.4rem; font:13px/1.5 ui-monospace,monospace; }
 .prompts h4 { margin:1.2rem 0 .2rem; } .prompts .help { margin:.2rem 0 .4rem; }
 .alias-table { border-collapse:collapse; font-size:.9rem; }
 .alias-table th,.alias-table td { padding:.4rem 1.5rem .4rem 0; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
 .alias-table tbody th { font-weight:600; }
-.badge { font:600 .8rem/1 ui-monospace,monospace; padding:.35rem .55rem; border:1px solid var(--line); border-radius:999px; color:var(--header); }
 main { max-width:1100px; margin:auto; padding:2rem 1rem 4rem; }
 h1,h2 { font-family:var(--display); font-weight:800; color:var(--title); letter-spacing:-.01em; }
 h1 { font-size:clamp(2.2rem,6vw,4rem); line-height:1; margin:.4rem 0 .6rem; }
@@ -83,7 +79,18 @@ button[aria-pressed=true] { background:var(--header); color:var(--accent-ink); }
 .help,.status { color:var(--muted); font-size:.93rem; } .status { min-height:1.4em; }
 .error { color:var(--danger); }
 .estimate { margin-top:1rem; padding:.9rem 1rem; background:var(--soft); border-radius:.5rem; font-size:.93rem; }
-.estimate table { border-collapse:collapse; margin:.4rem 0; } .estimate th,.estimate td { padding:.2rem .8rem .2rem 0; text-align:right; } .estimate th:first-child,.estimate td:first-child { text-align:left; }
+.estimate p { margin:.2rem 0; }
+/* Model sets: one column per radio choice, its observed cost beneath. */
+.set-table { width:100%; border-collapse:separate; border-spacing:.5rem 0; table-layout:fixed; }
+.set-table th,.set-table td { width:33.33%; padding:.6rem .7rem; text-align:left; vertical-align:top; background:var(--soft); }
+.set-table th { border-radius:.45rem .45rem 0 0; font-weight:400; } .set-table td { border-radius:0 0 .45rem .45rem; font-size:1.35rem; font-weight:700; font-variant-numeric:tabular-nums; color:var(--ink); }
+.set-table .radio { margin:0; } .set-table label { cursor:pointer; }
+.set-table th:has(input:checked),.set-table td.selected { background:var(--line); }
+@media (max-width:560px) {
+  .set-table { border-spacing:.3rem 0; }
+  .set-table th,.set-table td { padding:.5rem .45rem; overflow-wrap:break-word; hyphens:auto; }
+  .set-table th { font-size:.82rem; } .set-table td { font-size:1.1rem; }
+}
 .table-scroll { max-width:100%; overflow-x:auto; }
 
 /* Progress grid: text labels plus color, never color alone. */
