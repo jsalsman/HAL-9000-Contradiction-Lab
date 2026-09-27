@@ -35,16 +35,26 @@ def test_page_and_catalog(client):
     assert catalog["protocol_version"] == PROTOCOL_VERSION and len(catalog["models"]) == 19
 
 
-def test_estimate_uses_live_pricing(client, app_module):
+def test_set_costs_are_observed_after_a_run_and_estimated_before(client, app_module):
     body = client.get("/api/estimate").get_json()
-    assert body["sets"]["default"]["units"] == 85
-    assert body["sets"]["expensive"]["units"] == 10
-    assert body["sets"]["all"]["units"] == 95
-    assert (
-        body["sets"]["all"]["totals"]["total"]["likely"]
-        > body["sets"]["default"]["totals"]["total"]["likely"]
+    assert [body["sets"][s]["units"] for s in ("default", "expensive", "all")] == [85, 10, 95]
+    # Nothing has run yet, so every model is priced from live rates.
+    assert body["sets"]["all"]["estimated"] == list(model_set("all"))
+    assert body["sets"]["all"]["total"] == pytest.approx(
+        body["sets"]["default"]["total"] + body["sets"]["expensive"]["total"], abs=1e-3
     )
-    assert body["assumptions"]["tested"]["output"] == {"low": 1000, "likely": 1800, "high": 4000}
+    assert "assumptions" not in body
+    stream(client, model_set="default")
+    body = client.get("/api/estimate").get_json()
+    # Each default unit cost $0.012 as reported (tested plus judge).
+    assert body["sets"]["default"] == {
+        "units": 85,
+        "total": pytest.approx(85 * 0.012),
+        "estimated": [],
+        "missing": [],
+    }
+    assert body["per_model"]["openai/gpt-6-sol"]["source"] == "observed"
+    assert body["sets"]["expensive"]["estimated"] == list(model_set("expensive"))
 
 
 def test_full_run_default_set(client, app_module):

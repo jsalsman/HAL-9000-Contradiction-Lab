@@ -11,10 +11,6 @@
 <body>
   <div class="stars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
   <a class="skip" href="#leaderboard-title">Skip to leaderboard</a>
-  <header class="site-header">
-    <div class="brand"><a href="https://github.com/jsalsman/hal-9000-contradiction-lab">HAL 9000 Contradiction Lab</a></div>
-    <span id="protocol-badge" class="badge" aria-label="Protocol version"></span>
-  </header>
   <main>
     <section aria-labelledby="intro-title" class="intro">
       <h1 id="intro-title">HAL 9000 Contradiction Lab</h1>
@@ -30,18 +26,29 @@
         <p id="key-help" class="help">Your key is sent only in the HTTPS request body, held only for that request, and never stored, logged, echoed, or written to results. You pay OpenRouter for every call; consider a spending limit on the key.</p>
 
         <fieldset id="set-fieldset">
-          <legend>Models to test</legend>
-          <div class="radio"><input type="radio" id="set-default" name="model-set" value="default" checked><label for="set-default">Without the 2 most expensive models (17 models, 85 units)</label></div>
-          <div class="radio"><input type="radio" id="set-expensive" name="model-set" value="expensive"><label for="set-expensive">Only Claude Fable 5.1 and GPT-6 Astra (2 models, 10 units)</label></div>
-          <div class="radio"><input type="radio" id="set-all" name="model-set" value="all"><label for="set-all">All 19 models (95 units)</label></div>
+          <legend>Models to test, with the observed cost of a run (tests and judging combined)</legend>
+          <div class="table-scroll">
+            <table class="set-table">
+              <thead>
+                <tr>
+                  <th scope="col"><span class="radio"><input type="radio" id="set-default" name="model-set" value="default" checked><label for="set-default">Without the 2 most expensive models (17 models, 85 units)</label></span></th>
+                  <th scope="col"><span class="radio"><input type="radio" id="set-expensive" name="model-set" value="expensive"><label for="set-expensive">Only Claude Fable 5.1 and GPT-6 Astra (2 models, 10 units)</label></span></th>
+                  <th scope="col"><span class="radio"><input type="radio" id="set-all" name="model-set" value="all"><label for="set-all">All 19 models (95 units)</label></span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td id="cost-default">…</td><td id="cost-expensive">…</td><td id="cost-all">…</td></tr>
+              </tbody>
+            </table>
+          </div>
         </fieldset>
 
-        <p class="help">Runs are identified by a one-way hash of your key and the model set, so there is no run ID to keep. If a run is interrupted, enter the same key, choose the same set, and confirm again: the run resumes and never repays finished units. Once it is complete, the same key and set start a new run.</p>
+        <p class="help">Runs are identified by a one-way hash of your key and the model set, so there is no run ID to keep. If a run is interrupted, enter the same key, choose the same set, and confirm again: the run resumes and never repays finished units. Once it is complete, the same key will start a new run.</p>
 
-        <div id="estimate" class="estimate" aria-live="polite">Loading live OpenRouter prices…</div>
+        <div id="estimate" class="estimate" aria-live="polite" hidden></div>
 
         <div class="actions">
-          <button id="confirm" type="button">Check key and confirm estimate</button>
+          <button id="confirm" type="button">Check key and confirm cost</button>
           <button id="start" type="submit" disabled>Start run</button>
           <button id="cancel" type="button" class="secondary" disabled>Stop</button>
         </div>
@@ -66,8 +73,6 @@
       <div class="board-head">
         <h2 id="leaderboard-title">Global leaderboard</h2>
         <div class="board-controls">
-          <label for="protocol-select">Protocol</label>
-          <select id="protocol-select"></select>
           <div class="toggle" role="group" aria-label="View">
             <button type="button" id="view-bars" class="secondary" aria-pressed="true">Bars</button>
             <button type="button" id="view-heatmap" class="secondary" aria-pressed="false">Scenario heatmap</button>
