@@ -54,7 +54,27 @@ fi
 STAGE=$(mktemp -d)
 BUILD=$(mktemp -d)
 OUT=$(mktemp -d)
-trap 'rm -rf "$STAGE" "$BUILD" "$OUT"' EXIT
+trap 'rm -rf "$STAGE" "$BUILD" "$OUT"; rm -f "$PAPER"/.arxiv-*.part' EXIT
+
+# Copy finished outputs from $OUT into paper/ as hidden .part files, then rename them into
+# place (a rename within one directory is atomic). If any copy or rename fails, remove
+# every output so a failed run never leaves a partial or unmatched tarball and preview.
+publish() {
+  for name in "$@"; do
+    if ! cp "$OUT/$name" "$PAPER/.$name.part"; then
+      rm -f "$PAPER/arxiv-upload.tar.gz" "$PAPER/arxiv-preview.pdf"
+      echo "Could not write $PAPER/$name; nothing was written." >&2
+      exit 1
+    fi
+  done
+  for name in "$@"; do
+    if ! mv "$PAPER/.$name.part" "$PAPER/$name"; then
+      rm -f "$PAPER/arxiv-upload.tar.gz" "$PAPER/arxiv-preview.pdf"
+      echo "Could not write $PAPER/$name; nothing was written." >&2
+      exit 1
+    fi
+  done
+}
 
 # The paper, the JAIR Author Kit class files it needs, and acmart's source, which acmart's
 # license requires alongside the generated class. arxiv.flag switches the source to its arXiv
@@ -75,7 +95,7 @@ printf '%s\n' "Marks this directory as the arXiv upload; hal-contradiction-lab.t
 tar -czf "$OUT/arxiv-upload.tar.gz" -C "$STAGE" .
 
 if [ "$PREVIEW" = no ]; then
-  mv "$OUT/arxiv-upload.tar.gz" "$PAPER/"
+  publish arxiv-upload.tar.gz
   echo "Wrote $PAPER/arxiv-upload.tar.gz (no preview built)"
   exit 0
 fi
@@ -102,6 +122,6 @@ for step in pdflatex biber pdflatex pdflatex; do
     pdflatex -interaction=nonstopmode -halt-on-error hal-contradiction-lab.tex >/dev/null || latex_failed
   fi
 done
-mv "$OUT/arxiv-upload.tar.gz" "$PAPER/"
-cp hal-contradiction-lab.pdf "$PAPER/arxiv-preview.pdf"
+cp hal-contradiction-lab.pdf "$OUT/arxiv-preview.pdf"
+publish arxiv-upload.tar.gz arxiv-preview.pdf
 echo "Wrote $PAPER/arxiv-upload.tar.gz and $PAPER/arxiv-preview.pdf"
