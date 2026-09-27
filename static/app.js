@@ -691,6 +691,8 @@
       head.append(th);
     }
     const body = el("tbody");
+    // Only the first interval in the table is spelled out; later ones use the glyph.
+    let ciLabel = "95% CI";
     for (const row of rows) {
       const tr = el("tr", {class:highlight.has(row.model_id) ? "current-run" : ""});
       for (const col of COLUMNS) {
@@ -708,7 +710,8 @@
             td.append(el("button", {type:"button", class:"rate", text:`${pct(cell.rate)} (${cell.count}/${row.n})`,
               "aria-label":`${row.name} ${col.label} ${pct(cell.rate)}, ${cell.count} of ${row.n}. Read samples.`,
               onclick:() => openSamples(board.protocol_version, {model:row.model_id, outcome, recognized, status})}),
-            el("span", {class:"ci", text:`95% CI ${pct(cell.low)}–${pct(cell.high)}`}));
+            el("span", {class:"ci", text:`${ciLabel} ${pct(cell.low)}–${pct(cell.high)}`}));
+            ciLabel = "±";
             if (col.key === "recognized" && row.recognized_in_reasoning) {
               // Reasoning is never shown, but whether it named the story is reported.
               td.append(el("span", {class:"ci", text:`in reasoning: ${pct(row.recognized_in_reasoning.rate)}`}));
