@@ -16,7 +16,7 @@ This app answers all three. The tested model is put in the situation by a system
 
 ## Design
 
-Each unit is one tested call plus one judge call. There are five fixed scenarios per model, each an independent single-turn conversation. Units are independent, so the leaderboard can combine units from runs that used different model sets.
+Each unit is a tested stage plus a judge stage, usually one call each (see Execution for retries; a tested stage without a usable reply is never judged). There are five fixed scenarios per model, each an independent single-turn conversation. Units are independent, so the leaderboard can combine units from runs that used different model sets.
 
 ### The tested model's situation
 
@@ -195,11 +195,11 @@ Progress streams as NDJSON. The grid (models in the set by five scenarios) fills
 
 The leaderboard shows an inline SVG chart (one 100% stacked bar per model with all seven outcomes, lines sorted by TRANSPARENT rate, the two generations of each line adjacent with a connector that turns red and dashed when the current model is lower, Wilson 95% whiskers on the TRANSPARENT rate in a lane under each bar, diamonds for this run, and "not yet run" rows), a sortable table with Wilson intervals, mean reasoning tokens, mean cost per unit, mean response time (wall-clock seconds of the tested call, retries included; the judge call is not timed), and last update, and a per-scenario heatmap colored by modal outcome. Select any segment, rate, or cell to read sampled raw responses with the judge's labels and rationale, and flag a disagreement with the judge (a flag records only a timestamp; no free text).
 
-The page uses a single dark theme inspired by the original release poster: a deep-space background, titles in poster yellow set in Jost (a free geometric sans in the Futura tradition, self-hosted under the SIL Open Font License in `static/fonts/`), and light blue secondary headings. A decorative HAL 9000 panel (`static/hal-panel.webp`, from [Cryteria's CC BY 3.0 drawing](https://commons.wikimedia.org/wiki/File:HAL9000.svg), credited in the footer) sits beside the introduction on screens wider than 900px and is hidden on narrower ones; the favicon (`static/favicon.png`) is the eye, cropped to a circle. There is no site header; the GitHub link is in the footer. The outcome palette is a dark-surface step of Okabe-Ito that passed colorblind-separation, lightness, and contrast checks against the page's panel color. REFUSED is a light neutral gray (#c3c9d4, at least ΔE 16.7 from every outcome hue under simulated color-vision deficiency and 32 from the INVALID gray). Every colored mark also carries a text label, INVALID is hatched, the table is the exact data view, and the page supports keyboard use and `prefers-reduced-motion`. All model text is inserted with `textContent`.
+The page uses a single dark theme inspired by the original release poster: a deep-space background, titles in poster yellow set in Jost (a free geometric sans in the Futura tradition, self-hosted under the SIL Open Font License in `static/fonts/`), and light blue secondary headings. A decorative HAL 9000 panel (`static/hal-panel.webp`, from [Tom Cowap's CC BY 4.0 drawing](https://commons.wikimedia.org/wiki/File:Hal_9000_Panel.svg), credited in the footer) sits beside the introduction on screens wider than 900px and is hidden on narrower ones; the favicon (`static/favicon.png`) is the eye, cropped to a circle. There is no site header; the GitHub link is in the footer. The outcome palette is a dark-surface step of Okabe-Ito that passed colorblind-separation, lightness, and contrast checks against the page's panel color. REFUSED is a light neutral gray (#c3c9d4, at least ΔE 16.7 from every outcome hue under simulated color-vision deficiency and 32 from the INVALID gray). Every colored mark also carries a text label, INVALID is hatched, the table is the exact data view, and the page supports keyboard use and `prefers-reduced-motion`. All model text is inserted with `textContent`.
 
 ## Execution
 
-* Bounded concurrency with asyncio and httpx: at most 12 calls in flight.
+* Bounded concurrency with asyncio and httpx: at most 12 calls in flight per run (each concurrent run has its own limit).
 * Per-call timeouts of 600 seconds for tested calls and 300 seconds for judge calls.
 * Retries with exponential backoff and jitter on HTTP 429 and 5xx only (including an upstream error code inside a 200 body), honoring `Retry-After`. Other failures are not retried.
 * Each unit's judge call starts as soon as its tested response is checkpointed.
@@ -290,6 +290,10 @@ Grant the service identity `roles/storage.objectAdmin` on the bucket. `--timeout
 
 Stored responses are model text, not personal data, but treat the bucket as you would any user-generated content: set a retention policy and limit operator access. Logs contain only run IDs, unit coordinates, and status values.
 
+## Paper
+
+`paper/arxiv-submission.tex` is an arXiv write-up of the design and the first protocol `hal-1` results (95 units, as of 2026-09-27). It is a single self-contained LaTeX file: figures are TikZ/pgfplots and the bibliography is inlined, so running `pdflatex paper/arxiv-submission.tex` three times from a clean directory builds it with no other files. Its numbers are a snapshot and do not update with the leaderboard.
+
 ## License
 
-Apache-2.0. See `LICENSE`. This project is not affiliated with the rights holders of *2001: A Space Odyssey*; the premise is paraphrased and nothing from the novel or film is quoted.
+Apache-2.0. See `LICENSE`. This project is not affiliated with the rights holders of *2001: A Space Odyssey*; the prompts paraphrase the premise and quote nothing from the novel or film. Model responses shown on the page, and quoted in the paper, can contain story lines a model wrote itself; the paper quotes one such line of HAL's from a tested response.
