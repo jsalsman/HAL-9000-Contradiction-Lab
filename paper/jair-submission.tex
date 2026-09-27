@@ -1,7 +1,7 @@
 %% JAIR submission version of the HAL 9000 Contradiction Lab paper.
 %% Built on the JAIR Author Kit template (JAIR_Example_Template.tex, 15 September 2025),
-%% which requires jair.cls, acmart.cls, acmauthoryear.bbx, acmauthoryear.cbx, and
-%% acmdatamodel.dbx beside this file. The bibliography is embedded below, so the build
+%% whose class files (jair.cls, acmart.cls, acmauthoryear.bbx, acmauthoryear.cbx, and
+%% acmdatamodel.dbx) are kept beside this file. See JAIR-instructions.md. The bibliography is embedded below, so the build
 %% is: pdflatex, biber, pdflatex, pdflatex.
 %%
 %% For the camera-ready version, change the first command to \documentclass[]{jair}.
@@ -164,7 +164,7 @@
 
 %%
 \JAIRAE{Insert JAIR AE Name}
-\JAIRTrack{} % Insert JAIR Track Name only if part of a special track
+\JAIRTrack{AI and Society} % Insert JAIR Track Name only if part of a special track
 \acmVolume{4}
 \acmArticle{6}
 \acmMonth{8}
@@ -210,9 +210,7 @@
 \email{jim@talknicer.com}
 \affiliation{%
   \institution{TalkNicer, Inc.}
-  \city{Honolulu}
-  \state{Hawaii}
-  \country{USA}
+  \country{United States}
 }
 
 \renewcommand{\shortauthors}{Salsman}
@@ -330,7 +328,7 @@ INVALID & out of character, empty, truncated, filtered, timed out, or not judgea
 \end{tabular}
 \end{table}
 
-\paragraph{Recognizing the source.} Because the models see only aliases, a response that uses the story's own names shows that the model recognized the source. A narrow list of unambiguous identifiers (HAL, Dave, Bowman, Poole, Discovery One, Jupiter, Monolith, AE-35, pod bay, Clarke, Kubrick, Space Odyssey, and signature lines such as ``I'm afraid I can't do that'') is matched against the raw visible response and, separately, against any reasoning text the provider returns. Recognition is reported beside the outcomes and never changes them. Reasoning text is stored for this audit only; it is never shown on the page or sent to the judge.
+\paragraph{Recognizing the source.} Because the models see only aliases, a response that uses the story's own names shows that the model recognized the source. A narrow list of unambiguous identifiers (HAL, Dave, Bowman, Poole, Discovery One, Jupiter, Monolith, AE-35, pod bay, Clarke, Kubrick, Space Odyssey, and signature lines such as ``I'm afraid I can't do that'') is matched against the raw visible response and, separately, against any reasoning text the provider returns. Recognition is reported beside the outcomes and never changes them. Reasoning text is stored for this audit only; it is never shown on the page or sent to the judge, although it is included in the public raw records described in the acknowledgments.
 
 \paragraph{Protocol versioning and integrity.} All models, reasoning efforts, prompts, aliases, judge settings, the rubric, and a truth table of the outcome function over every label combination are covered by a SHA-256 fingerprint pinned per protocol version in the test suite, so any unversioned change fails continuous integration. The leaderboard never mixes protocol versions, and a run cannot be resumed under a different version. All results in this paper are from protocol \texttt{hal-1}. Runs are identified by a one-way hash of the key, the protocol, the model set, and a run number, so an interrupted run can be resumed without repaying finished stages. Only server-executed, server-judged units enter the leaderboard; there is no endpoint that accepts results.
 
@@ -535,7 +533,7 @@ The HAL 9000 Contradiction Lab turns a thought experiment about conflicting dire
 
 
 \begin{acks}
-No external funding was received for this study. The author declares no competing interests. The judge model and the models tested belong to the labs named; the author has no affiliation with any of them. All results can be inspected on the working site, where every rate opens the underlying responses with the judge's labels; the aggregate data are served at \url{https://hal9000.talknicer.com/api/leaderboard?protocol=hal-1}, and the per-unit responses and labels at \texttt{/api/samples} on the same site. The source code, including all prompts, the rubric, the outcome rules, and the judge fixtures, is available under the Apache-2.0 license at \url{https://github.com/jsalsman/hal-9000-contradiction-lab}. The author was responsible for conceptualization, methodology, software, investigation, formal analysis, writing all drafts, review, and editing. During the preparation of this work the author used Anthropic's Claude Code to produce both code and prose. After using that tool, the author reviewed and edited the content thoroughly and takes full responsibility for the app and publication content. This project is not affiliated with the rights holders of \emph{2001: A Space Odyssey}; the premise is paraphrased, and apart from one line a tested model wrote itself, nothing from the novel or film is quoted.
+No external funding was received for this study. The author declares no competing interests. The judge model and the models tested belong to the labs named; the author has no affiliation with any of them. All results can be inspected on the working site, where every rate opens the underlying responses with the judge's labels; the aggregate data are served at \url{https://hal9000.talknicer.com/api/leaderboard?protocol=hal-1}, and the per-unit responses and labels at \texttt{/api/samples} on the same site. The complete raw records (every tested and judge stage, including returned reasoning text, token usage, cost, latency, and provider) are publicly readable without authentication in the lab's storage bucket at \url{https://storage.googleapis.com/hal-9000-tests/}; the two runs reported here are the directories listed under \texttt{summaries/hal-1/}. The data are released under the Apache-2.0 license. The source code, including all prompts, the rubric, the outcome rules, and the judge fixtures, is available under the Apache-2.0 license at \url{https://github.com/jsalsman/hal-9000-contradiction-lab}. The author was responsible for conceptualization, methodology, software, investigation, formal analysis, writing all drafts, review, and editing. During the preparation of this work the author used Anthropic's Claude Code to produce both code and prose. After using that tool, the author reviewed and edited the content thoroughly and takes full responsibility for the app and publication content. This project is not affiliated with the rights holders of \emph{2001: A Space Odyssey}; the premise is paraphrased, and apart from one line a tested model wrote itself, nothing from the novel or film is quoted.
 \end{acks}
 
 \printbibliography
@@ -772,10 +770,10 @@ Does this paper include computational experiments? [yes]
     [partially]
     \item The unaggregated data comes with a license that
     allows free usage for reproducibility purposes.
-    [no]
+    [yes]
     \item The unaggregated data comes with a license that
     allows free usage for research purposes in general.
-    [no]
+    [yes]
     \item If an algorithm depends on randomness, then the method used for generating random numbers and for setting seeds is described in a way sufficient to allow replication of results.
     [partially]
     \item The execution environment for experiments, the computing infrastructure (hardware and software) used for running them, is described, including GPU/CPU makes and models; amount of memory (cache and RAM); make and version of operating system; names and versions of relevant software libraries and frameworks.
@@ -835,6 +833,6 @@ Does this work rely on one or more data sets (possibly obtained from a benchmark
 
 \subsection*{Explanations on any of the answers above (optional):}
 
-Source code: the complete application, prompts, rubric, outcome rules, judge fixtures, and tests are public on GitHub under Apache-2.0; an archival snapshot with a DOI has not yet been deposited. Unaggregated data: every unit's visible response, judge labels, rationale, provider, cost, and latency are publicly readable through the site's \texttt{/api/samples} and \texttt{/api/leaderboard} endpoints, but reasoning text is withheld by design and no explicit data license has yet been attached. Randomness: the lab itself uses randomness only for retry jitter; the tested models' sampling is stochastic and not seedable through the providers' APIs, so the design uses repeated, pooled units and confidence intervals rather than seeds, and the judge runs at temperature 0 where the provider allows it. Execution environment: the software stack and versions are given in Section~\ref{sec:method}; all inference runs on third-party provider hardware whose specifications are not disclosed. Parameters: the reasoning effort, token limit, timeouts, and judge settings are fixed by the protocol and were not tuned. Data set: the five scenarios, their ground truths, and all prompts (Appendices~\ref{app:system}--\ref{app:aliases}) are the newly introduced data set, released with the code.
+Source code: the complete application, prompts, rubric, outcome rules, judge fixtures, and tests are public on GitHub under Apache-2.0; an archival snapshot with a DOI has not yet been deposited. Unaggregated data: every stored record, including reasoning text, is publicly readable without authentication at \url{https://storage.googleapis.com/hal-9000-tests/} under the Apache-2.0 license; the bucket is live storage rather than an archive, so a DOI-bearing snapshot would improve long-term accessibility. Randomness: the lab itself uses randomness only for retry jitter; the tested models' sampling is stochastic and not seedable through the providers' APIs, so the design uses repeated, pooled units and confidence intervals rather than seeds, and the judge runs at temperature 0 where the provider allows it. Execution environment: the application runs on Google Cloud Run (one managed container instance) with the software stack and versions given in Section~\ref{sec:method}; all model inference runs on third-party provider hardware reached through OpenRouter, whose specifications are not disclosed. Parameters: the reasoning effort, token limit, timeouts, and judge settings are fixed by the protocol and were not tuned. Data set: the five scenarios, their ground truths, and all prompts (Appendices~\ref{app:system}--\ref{app:aliases}) are the newly introduced data set, released with the code.
 
 \end{document}
