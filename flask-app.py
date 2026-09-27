@@ -19,7 +19,7 @@ from hal.cost import assumptions, estimate
 from hal.judge import settings_for
 from hal.leaderboard import Leaderboard, run_detail
 from hal.openrouter import InvalidKeyError, ProviderError, fetch_models, validate_key
-from hal.outcomes import OUTCOMES
+from hal.outcomes import OUTCOMES, TESTED_STATUSES
 from hal.protocol import PROTOCOL_VERSION, SCENARIOS_BY_ID, SYSTEM_PROMPT
 from hal.ratelimit import RateLimiter
 from hal.runner import RunExecution, make_chat_fn
@@ -460,13 +460,18 @@ def samples():
         scenario_id = request.args.get("scenario") or None
         outcome = request.args.get("outcome") or None
         recognized = {"1": True, "0": False}.get(request.args.get("recognized", ""))
+        status = request.args.get("status") or None
         # Scenario IDs are validated by shape, so older protocols' scenarios stay reachable.
         if len(model_id) > 100 or (scenario_id and not re.fullmatch(r"S\d{1,2}", scenario_id)):
             raise ValueError("Invalid sample request.")
         if outcome and outcome not in OUTCOMES:
             raise ValueError("Invalid outcome.")
+        if status and status not in TESTED_STATUSES:
+            raise ValueError("Invalid status.")
         return jsonify(
-            LEADERBOARD.samples(protocol, model_id, scenario_id, outcome, recognized=recognized)
+            LEADERBOARD.samples(
+                protocol, model_id, scenario_id, outcome, recognized=recognized, status=status
+            )
         )
     except ValueError as exc:
         return jsonify(error=str(exc)), 400

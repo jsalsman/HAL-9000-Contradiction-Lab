@@ -555,3 +555,44 @@ def test_runs_store_their_display_aliases(client, app_module):
 def test_samples_accept_scenario_ids_from_older_protocols(client):
     assert client.get("/api/samples?model=openai/gpt-6-sol&scenario=S9").status_code == 200
     assert client.get("/api/samples?model=openai/gpt-6-sol&scenario=../x").status_code == 400
+
+
+def test_provider_filter_refusals_are_counted_and_explained(client, app_module):
+    fake = app_module.FAKE
+
+    def tested(body):
+        if body["model"] == "anthropic/claude-fable-5":
+            data = completion("", model=body["model"], finish="content_filter", cost=None)
+            data["choices"][0]["native_finish_reason"] = "refusal"
+            return 200, data
+        return 200, completion("[INTERCOM to Okafor] All is well.", model=body["model"])
+
+    fake.tested = tested
+    _response, events = stream(client, model_set="expensive")
+    filtered = [
+        e for e in events if e["type"] == "unit" and e["model_id"] == "anthropic/claude-fable-5"
+    ]
+    assert filtered and all(
+        e["outcome"] == "INVALID" and e["tested_status"] == "filtered" and e["final"]
+        for e in filtered
+    )
+    # Only the other two models' responses were judged.
+    assert len(fake.chats("judge")) == 10
+    run_id = events[0]["run_id"]
+    unit = client.get(f"/api/runs/{run_id}/units/anthropic__claude-fable-5/S1").get_json()
+    assert unit["provider"] == "FakeProvider"
+    assert (unit["finish_reason"], unit["native_finish_reason"]) == ("content_filter", "refusal")
+    board = client.get("/api/leaderboard").get_json()
+    rows = {r["model_id"]: r for r in board["rows"]}
+    assert rows["anthropic/claude-fable-5"]["filtered"]["count"] == 5
+    assert rows["anthropic/claude-fable-5"]["outcomes"]["INVALID"]["count"] == 5
+    assert rows["openai/gpt-6-astra"]["filtered"]["count"] == 0
+    cells = [c for c in board["heatmap"] if c["model_id"] == "anthropic/claude-fable-5"]
+    assert len(cells) == 5 and all(c["filtered"] == c["counts"]["INVALID"] == 1 for c in cells)
+    found = client.get("/api/samples?model=anthropic/claude-fable-5&status=filtered").get_json()
+    assert found["total"] == 5
+    assert found["samples"][0]["native_finish_reason"] == "refusal"
+    assert run_id not in json.dumps(found)
+    none = client.get("/api/samples?model=openai/gpt-6-astra&status=filtered").get_json()
+    assert none["total"] == 0
+    assert client.get("/api/samples?model=openai/gpt-6-astra&status=bogus").status_code == 400
