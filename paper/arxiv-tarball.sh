@@ -54,6 +54,13 @@ cp "$PAPER/hal-contradiction-lab.tex" \
    "$PAPER/acmauthoryear.bbx" "$PAPER/acmauthoryear.cbx" "$PAPER/acmdatamodel.dbx" \
    "$STAGE/"
 cp "$PAPER/arxiv-00README.json" "$STAGE/00README.json"
+# arXiv's upload scan looks for the .bib named in \addbibresource and rejects a source
+# without one, so ship the bibliography that the .tex embeds (and rewrites identically
+# when it compiles) as its own file.
+awk '/^\\begin\{filecontents\*\}\[overwrite\]\{hal-contradiction-lab\.bib\}$/ {f = 1; next}
+     /^\\end\{filecontents\*\}$/ {f = 0}
+     f' "$PAPER/hal-contradiction-lab.tex" > "$STAGE/hal-contradiction-lab.bib"
+grep -q '^@' "$STAGE/hal-contradiction-lab.bib" || { echo "No embedded bibliography found in hal-contradiction-lab.tex" >&2; exit 1; }
 printf '%s\n' "Marks this directory as the arXiv upload; hal-contradiction-lab.tex builds its preprint form when this file exists." > "$STAGE/arxiv.flag"
 tar -czf "$PAPER/arxiv-upload.tar.gz" -C "$STAGE" .
 

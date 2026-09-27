@@ -32,7 +32,8 @@ Without TeX, `paper/arxiv-tarball.sh --no-preview` writes only the tarball. That
 
 | File | Why it is there |
 |---|---|
-| `hal-contradiction-lab.tex` | The paper, with its bibliography embedded (written out as `hal-contradiction-lab.bib` during the build) |
+| `hal-contradiction-lab.tex` | The paper, with its bibliography embedded |
+| `hal-contradiction-lab.bib` | That bibliography extracted by the script, because arXiv's upload scan requires the `.bib` file named in `\addbibresource` (the build rewrites it with identical content) |
 | `jair.cls` | The JAIR class the paper is set in |
 | `acmart.cls` | The acmart v2.12 class that `jair.cls` extends |
 | `acmart.dtx`, `acmart.ins` | acmart's source, which its license requires to accompany the generated `acmart.cls`; not compiled |
