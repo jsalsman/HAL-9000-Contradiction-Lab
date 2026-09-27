@@ -29,5 +29,5 @@ paper/*.out
 paper/*.run.xml
 paper/*.toc
 paper/*.cut
-paper/hal-contradiction-lab.bib
+paper/*.bib
 paper/arxiv-upload.tar.gz
