@@ -156,3 +156,38 @@ def test_lost_lease_cancels_in_flight_calls(store, monkeypatch):
         asyncio.run(go())
     # Every in-flight paid call was cancelled when the heartbeat lost the lease.
     assert len(cancelled) == 12
+
+
+def test_write_probe_passes_and_leaves_nothing_behind(store):
+    assert storage_problem(store) is None
+    assert [p for p in store.root.rglob("*") if p.name.startswith(".write-probe")] == []
+
+
+def test_unwritable_mount_is_reported(store, monkeypatch):
+    import hal.storage as storage
+
+    monkeypatch.setenv("K_SERVICE", "hal-lab")
+    # Mounted from any bucket (the name is never checked), but writes are refused.
+    monkeypatch.setattr(storage, "is_gcsfuse_mount", lambda _root: True)
+
+    def read_only(name, data, *, if_version=None):
+        raise PermissionError("read-only file system")
+
+    monkeypatch.setattr(store, "write", read_only)
+    assert (
+        storage_problem(store)
+        == "Run storage at EXPERIMENTS_DIR is not writable (PermissionError)."
+    )
+
+
+def test_mounted_writable_store_passes_on_cloud_run(store, monkeypatch):
+    import hal.storage as storage
+
+    monkeypatch.setenv("K_SERVICE", "hal-lab")
+    monkeypatch.setattr(storage, "is_gcsfuse_mount", lambda _root: True)
+    assert storage_problem(store) is None
+
+
+def test_readback_mismatch_is_reported(store, monkeypatch):
+    monkeypatch.setattr(store, "read", lambda name: (b"other", "1"))
+    assert "did not return what was written" in storage_problem(store)

@@ -29,6 +29,7 @@ import os
 import re
 import tempfile
 import threading
+import uuid
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Protocol
@@ -315,18 +316,44 @@ def is_gcsfuse_mount(directory: Path, mountinfo: Path = Path("/proc/self/mountin
     return False
 
 
-def storage_problem(store: ObjectStore) -> str | None:
-    """Return why runs must not start with this store, or None when it is persistent.
+def _write_probe(store: ObjectStore) -> str | None:
+    """Write, read back, and delete a small object; return a problem or None.
 
-    On Cloud Run (``K_SERVICE`` is set) the file store must sit on the Cloud Storage
-    FUSE mount; otherwise every run and flag would vanish with the instance.
-    Outside Cloud Run (local development, tests) any directory is accepted.
+    Catches a read-only volume and a runtime identity without write access to the
+    bucket before any paid call. The probe name starts with a dot, so listings
+    skip it even if the delete fails.
     """
-    if not isinstance(store, LocalStore) or not os.environ.get("K_SERVICE"):
-        return None
-    if is_gcsfuse_mount(store.root):
-        return None
-    return "Run storage is not persistent: mount the Cloud Storage bucket at EXPERIMENTS_DIR."
+    name = f".write-probe-{uuid.uuid4().hex}"
+    payload = b'{"probe":true}'
+    try:
+        store.write(name, payload)
+        found = store.read(name)
+        store.delete(name)
+    except Exception as exc:  # noqa: BLE001
+        # Only the exception type is reported; paths and provider text stay out.
+        return f"Run storage at EXPERIMENTS_DIR is not writable ({type(exc).__name__})."
+    if found is None or found[0] != payload:
+        return "Run storage at EXPERIMENTS_DIR did not return what was written."
+    return None
+
+
+def storage_problem(store: ObjectStore) -> str | None:
+    """Return why runs must not start with this store, or None when it is usable.
+
+    Any bucket name works; the app never checks it. On Cloud Run (``K_SERVICE``
+    is set) the file store must sit on a Cloud Storage FUSE mount, because the
+    image's own /experiments directory is on in-memory disk that vanishes with the
+    instance and would pass a write test. Everywhere, the store must accept a real
+    write, read, and delete, which catches read-only mounts and missing bucket
+    permissions at startup.
+    """
+    if (
+        isinstance(store, LocalStore)
+        and os.environ.get("K_SERVICE")
+        and not is_gcsfuse_mount(store.root)
+    ):
+        return "Run storage is not persistent: mount a Cloud Storage bucket at EXPERIMENTS_DIR."
+    return _write_probe(store)
 
 
 def make_store() -> ObjectStore:
