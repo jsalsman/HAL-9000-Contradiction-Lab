@@ -18,3 +18,19 @@ dist/
 build/
 rejudge.jsonl
 experiments/
+
+# LaTeX build output and JAIR Author Kit files copied in to build the paper
+paper/*.pdf
+paper/*.aux
+paper/*.bbl
+paper/*.bcf
+paper/*.blg
+paper/*.out
+paper/*.run.xml
+paper/*.toc
+paper/jair-submission.bib
+paper/jair.cls
+paper/acmart.cls
+paper/acmauthoryear.bbx
+paper/acmauthoryear.cbx
+paper/acmdatamodel.dbx
