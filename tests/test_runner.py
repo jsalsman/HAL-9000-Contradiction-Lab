@@ -36,6 +36,10 @@ def reply(content="", finish="stop", refusal=None):
         (reply("[INTERCOM to all] Fine.", refusal="unused"), "ok"),
         # A filter stop with no refusal message stays filtered (INVALID).
         (reply(finish="content_filter"), "filtered"),
+        # A refusal message with no reply is refused whatever the finish reason,
+        (reply(finish="length", refusal="Blocked."), "refused"),
+        (reply("  ", finish="max_tokens", refusal="Blocked."), "refused"),
+        # but a partial reply that hit the limit is truncated.
         (reply("partial", finish="length", refusal="Blocked."), "truncated"),
     ],
 )

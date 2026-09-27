@@ -80,11 +80,12 @@ def tested_record(model_id: str, scenario_id: str, completion: Completion | None
         }
     content = completion.content.strip()
     filtered = completion.finish_reason == "content_filter"
-    if completion.finish_reason in TRUNCATION_REASONS:
-        status = "truncated"
-    elif completion.refusal and (filtered or not content):
-        # The provider sent a refusal message instead of a reply (REFUSED).
+    if completion.refusal and (filtered or not content):
+        # The provider sent a refusal message instead of a reply (REFUSED), even
+        # under a length finish; a partial reply that hit the limit stays truncated.
         status = "refused"
+    elif completion.finish_reason in TRUNCATION_REASONS:
+        status = "truncated"
     elif filtered:
         # Stopped by a safety filter with no refusal message (INVALID).
         status = "filtered"
