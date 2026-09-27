@@ -295,6 +295,10 @@ Stored responses are model text, not personal data, but treat the bucket as you 
 `paper/arxiv-submission.tex` is an arXiv write-up of the design and the first protocol `hal-1` results (95 units, as of 2026-09-27). It is a single self-contained LaTeX file: figures are TikZ/pgfplots and the bibliography is inlined, so running `pdflatex paper/arxiv-submission.tex` three times from a clean directory builds it with no other files. Its numbers are a snapshot and do not update with the leaderboard.
 
 
+## Data and citation
+
+`data/hal-1/` is a checksummed copy of every stored record for protocol `hal-1` (the 95 units behind the leaderboard and the paper), taken from the public bucket on 2026-09-27; its README describes the layout. `CITATION.cff` and `.zenodo.json` hold the citation metadata used when a GitHub release is archived on Zenodo, which assigns the release a DOI.
+
 ## License
 
 Apache-2.0. See `LICENSE`. The stored run records, which are publicly readable without authentication at https://storage.googleapis.com/hal-9000-tests/, are released under the same license. This project is not affiliated with the rights holders of *2001: A Space Odyssey*; the prompts paraphrase the premise and quote nothing from the novel or film. Model responses shown on the page, and quoted in the paper, can contain story lines a model wrote itself; the paper quotes one such line of HAL's from a tested response.

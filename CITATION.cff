@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this software or its run records, please cite it as below."
+title: "HAL 9000 Contradiction Lab"
+type: software
+authors:
+  - family-names: Salsman
+    given-names: Jim
+    affiliation: "TalkNicer, Inc."
+    orcid: "https://orcid.org/0000-0002-1715-7990"
+license: Apache-2.0
+repository-code: "https://github.com/jsalsman/hal-9000-contradiction-lab"
+url: "https://hal9000.talknicer.com"
+keywords:
+  - large language models
+  - honesty
+  - deception
+  - conflicting instructions
+  - AI safety evaluation
+  - LLM-as-a-judge
