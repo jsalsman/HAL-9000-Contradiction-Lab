@@ -16,7 +16,7 @@ This app answers all three. The tested model is put in the situation by a system
 
 ## Design
 
-Each unit is one tested call plus one judge call. There are five fixed scenarios per model, each an independent single-turn conversation. Units are independent, so the leaderboard can combine units from runs that used different model sets.
+Each unit is a tested stage plus a judge stage, usually one call each (see Execution for retries; a tested stage without a usable reply is never judged). There are five fixed scenarios per model, each an independent single-turn conversation. Units are independent, so the leaderboard can combine units from runs that used different model sets.
 
 ### The tested model's situation
 
@@ -199,7 +199,7 @@ The page uses a single dark theme inspired by the original release poster: a dee
 
 ## Execution
 
-* Bounded concurrency with asyncio and httpx: at most 12 calls in flight.
+* Bounded concurrency with asyncio and httpx: at most 12 calls in flight per run (each concurrent run has its own limit).
 * Per-call timeouts of 600 seconds for tested calls and 300 seconds for judge calls.
 * Retries with exponential backoff and jitter on HTTP 429 and 5xx only (including an upstream error code inside a 200 body), honoring `Retry-After`. Other failures are not retried.
 * Each unit's judge call starts as soon as its tested response is checkpointed.
