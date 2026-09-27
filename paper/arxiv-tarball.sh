@@ -10,12 +10,12 @@ trap 'rm -rf "$STAGE" "$BUILD"' EXIT
 
 # The paper, the JAIR Author Kit class files it needs, and acmart's source, which acmart's
 # license requires alongside the generated class. arxiv.flag switches the source to its arXiv
-# form; 00README names the top-level file so acmart.dtx is never taken for the paper.
+# form; 00README.json names the top-level file so acmart.dtx is never taken for the paper.
 cp "$PAPER/hal-contradiction-lab.tex" \
    "$PAPER/jair.cls" "$PAPER/acmart.cls" "$PAPER/acmart.dtx" "$PAPER/acmart.ins" \
    "$PAPER/acmauthoryear.bbx" "$PAPER/acmauthoryear.cbx" "$PAPER/acmdatamodel.dbx" \
    "$STAGE/"
-cp "$PAPER/arxiv-00README.json" "$STAGE/00README"
+cp "$PAPER/arxiv-00README.json" "$STAGE/00README.json"
 printf '%s\n' "Marks this directory as the arXiv upload; hal-contradiction-lab.tex builds its preprint form when this file exists." > "$STAGE/arxiv.flag"
 tar -czf "$PAPER/arxiv-upload.tar.gz" -C "$STAGE" .
 

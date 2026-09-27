@@ -27,7 +27,7 @@ It needs the same TeX Live packages as the JAIR build (listed in `JAIR-instructi
 | `acmart.dtx`, `acmart.ins` | acmart's source, which its license requires to accompany the generated `acmart.cls`; not compiled |
 | `acmauthoryear.bbx`, `acmauthoryear.cbx`, `acmdatamodel.dbx` | The biblatex citation style and data model |
 | `arxiv.flag` | Switches the source to its preprint form |
-| `00README` | arXiv's processing instructions (a copy of `arxiv-00README.json`): compile `hal-contradiction-lab.tex` with pdflatex under TeX Live 2023 (the version this build is tested with: biblatex 3.19, biber 2.19), and do not treat `acmart.dtx` or `acmart.ins` as papers |
+| `00README.json` | arXiv's processing instructions in its JSON format (a copy of `arxiv-00README.json`): compile `hal-contradiction-lab.tex` with pdflatex under TeX Live 2023 (the version this build is tested with: biblatex 3.19, biber 2.19), and do not treat `acmart.dtx` or `acmart.ins` as papers |
 
 Do not add a `.bbl` file: arXiv runs biber itself, and a `.bbl` from a different biblatex version breaks the build. Do not upload the PDF, the repository's other files, or `data/`; the code and data are cited by their Zenodo DOI.
 
