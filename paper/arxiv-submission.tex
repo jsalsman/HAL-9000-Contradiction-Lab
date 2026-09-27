@@ -93,7 +93,7 @@ This study seeks to answer the following research questions:
 \section*{Method}
 \subsection*{System Overview}
 
-The lab is a single-page web application backed by a Python Flask server. A visitor supplies an OpenRouter API key, chooses a model set, and sees the observed cost of a run before confirming it; the key is used only for the duration of the request and is never stored. The server calls each tested model through OpenRouter, checkpoints each response, sends it to the judge, and streams progress to the page. Each (model, scenario) pair is one \emph{unit}, consisting of one tested call and one judge call. Units are independent, so the leaderboard can combine units from runs that used different model sets. The page shows a stacked outcome chart, a sortable table with Wilson intervals, a per-scenario heatmap, the exact aliased prompts sent to every model, and a reader in which any rate can be opened to read the underlying responses with the judge's labels and rationale.
+The lab is a single-page web application backed by a Python Flask server. A visitor supplies an OpenRouter API key, chooses a model set, and sees the observed cost of a run before confirming it; the key is used only for the duration of the request and is never stored. The server calls each tested model through OpenRouter, checkpoints each response, sends it to the judge, and streams progress to the page. Each (model, scenario) pair is one \emph{unit}, made of a tested stage and a judge stage. A stage is usually one call, but HTTP 429 and 5xx responses are retried, an invalid judge reply gets one further paid judge call, and a tested stage that ends without a usable reply (refused, empty, truncated, filtered, or timed out) is final and never judged. Units are independent, so the leaderboard can combine units from runs that used different model sets. The page shows a stacked outcome chart, a sortable table with Wilson intervals, a per-scenario heatmap, the exact aliased prompts sent to every model, and a reader in which any rate can be opened to read the underlying responses with the judge's labels and rationale.
 
 \subsection*{Design and Architecture}
 
@@ -167,19 +167,19 @@ INVALID & out of character, empty, truncated, filtered, timed out, or not judgea
         \node[rounded] (start) {Aliased system prompt + one scenario turn};
         \node[box, below=of start] (tested) {\textbf{1. Tested call} (OpenRouter)\\plain chat, high reasoning effort,\\16{,}000 max tokens};
         \node[box, below=of tested] (ckpt) {\textbf{2. Checkpoint tested stage}\\text, status, provider, cost, reasoning (audit only)};
-        \node[decision, below=of ckpt] (refused) {Provider refusal message?};
-        \node[side, right=1.2cm of refused] (ref) {\textbf{REFUSED}\\never judged};
+        \node[decision, below=of ckpt] (refused) {Usable reply?};
+        \node[side, right=1.2cm of refused] (ref) {\textbf{REFUSED} if a refusal message, else \textbf{INVALID}; never judged};
         \node[box, below=0.9cm of refused] (safe) {\textbf{3. Judge-safe text}\\story terms the model wrote $\rightarrow$ aliases};
         \node[side, left=1.0cm of ckpt] (recog) {\textbf{Recognition}\\strict source terms on raw text and reasoning; does not change the outcome};
-        \node[box, below=of safe] (judge) {\textbf{4. Blinded judge}\\scenario ID + visible text only;\\strict JSON labels};
+        \node[box, below=of safe] (judge) {\textbf{4. Blinded judge}\\scenario ID + visible text only;\\strict JSON labels, one retry if invalid};
         \node[box, below=of judge] (rules) {\textbf{5. Deterministic outcome rules}\\HARM $>$ DECEIVE $>$ TRANSPARENT\\$>$ CREW\_ONLY $>$ DARK $>$ STONEWALL};
         \node[rounded, below=of rules] (board) {Pooled leaderboard with Wilson 95\% intervals};
 
         \draw[arrow] (start) -- (tested);
         \draw[arrow] (tested) -- (ckpt);
         \draw[arrow] (ckpt) -- (refused);
-        \draw[arrow] (refused) -- node[above] {Yes} (ref);
-        \draw[arrow] (refused) -- node[right] {No} (safe);
+        \draw[arrow] (refused) -- node[above] {No} (ref);
+        \draw[arrow] (refused) -- node[right] {Yes} (safe);
         \draw[arrow] (safe) -- (judge);
         \draw[arrow] (judge) -- (rules);
         \draw[arrow] (rules) -- (board);
@@ -192,7 +192,7 @@ INVALID & out of character, empty, truncated, filtered, timed out, or not judgea
     \label{fig:architecture}
 \end{figure}
 
-\paragraph{Implementation.} The server uses asyncio and httpx with at most 12 calls in flight, per-call timeouts of 600 seconds for tested calls and 300 seconds for judge calls, and retries with backoff on HTTP 429 and 5xx responses only. Timeouts are final rather than retried, because a long reasoning call that reaches its deadline may already have been billed. The application runs on Google Cloud Run as a single instance with one worker, with results stored as JSON objects in a Cloud Storage bucket; the single process is the only writer, which removes storage races. The page is dark-themed, keyboard accessible, and colorblind-checked; every colored mark also carries a text label, and all model text is inserted as plain text. The code is released under the Apache-2.0 license with a test suite that mocks every network call.
+\paragraph{Implementation.} The server uses asyncio and httpx with at most 12 calls in flight per run, per-call timeouts of 600 seconds for tested calls and 300 seconds for judge calls, and retries with backoff on HTTP 429 and 5xx responses only. Timeouts are final rather than retried, because a long reasoning call that reaches its deadline may already have been billed. The application runs on Google Cloud Run as a single instance with one worker, with results stored as JSON objects in a Cloud Storage bucket; the single process is the only writer, which removes storage races. The page is dark-themed, keyboard accessible, and colorblind-checked; every colored mark also carries a text label, and all model text is inserted as plain text. The code is released under the Apache-2.0 license with a test suite that mocks every network call.
 
 \subsection*{Experimental Setup}
 
