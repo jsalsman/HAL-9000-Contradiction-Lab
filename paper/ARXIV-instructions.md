@@ -15,7 +15,7 @@ This writes two files, both ignored by git:
 - `paper/arxiv-upload.tar.gz`, the file to upload.
 - `paper/arxiv-preview.pdf`, the preprint compiled from an unpacked copy of that tarball with `pdflatex`, `biber`, `pdflatex`, `pdflatex`, the same steps arXiv runs. Check it before uploading.
 
-The preview needs TeX Live and biber. The script checks for `pdflatex`, `biber`, and the LaTeX packages the paper loads before doing anything, and if any are missing it names them and prints the install command. On Debian or Ubuntu (including GitHub Codespaces), that is:
+The preview needs TeX Live and biber. The script first removes any tarball or preview left from an earlier run, then checks for `pdflatex`, `biber`, and the packages most often missing, and it test-builds the upload before writing anything into `paper/`. If a tool or any LaTeX file is missing, it names what is missing, prints the install command, and leaves no tarball or preview behind. On Debian or Ubuntu (including GitHub Codespaces), that is:
 
 ```sh
 sudo apt-get update
@@ -26,7 +26,7 @@ sudo apt-get install -y --no-install-recommends \
 
 `texlive-fonts-extra` is large (about a gigabyte) but is the package that provides the Libertine fonts the template requires. Ubuntu 24.04 ships TeX Live 2023, the version pinned for arXiv; check yours with `pdflatex --version`.
 
-Without TeX, `paper/arxiv-tarball.sh --no-preview` writes only the tarball. That is enough to upload, but then arXiv's own processed PDF is the only check, so compare it carefully in step 3 below.
+Without TeX, `paper/arxiv-tarball.sh --no-preview` writes only the tarball (and removes any old preview, so it cannot be mistaken for one of the new tarball). That is enough to upload, but then arXiv's own processed PDF is the only check, so compare it carefully in step 3 below.
 
 ## What the tarball contains
 
