@@ -247,11 +247,13 @@ def test_mean_response_time_and_backfill_for_older_summaries(store):
     older = unit(sol, "S2", "DARK", "g" * 24)  # written before latency was recorded
     missing = unit(sol, "S3", "DARK", "h" * 24)  # older, and its tested record is gone
     bad = {**unit("../x", "S4", "DARK", "i" * 24)}  # never turned into an object name
+    long_id = unit(sol, "S100", "DARK", "j" * 24)  # any number of scenario digits
     write_json(store, unit_name(run_id, sol, "S2", "tested"), {"latency_seconds": 90.5})
-    put(store, PROTOCOL_VERSION, run_id, "all", [recorded, older, missing, bad])
+    write_json(store, unit_name(run_id, sol, "S100", "tested"), {"latency_seconds": 60.5})
+    put(store, PROTOCOL_VERSION, run_id, "all", [recorded, older, missing, bad, long_id])
     board = Leaderboard(store, ttl=0)
     rows = {row["model_id"]: row for row in board.payload(PROTOCOL_VERSION)["rows"]}
-    assert rows[sol]["mean_latency_seconds"] == (30.0 + 90.5) / 2
+    assert rows[sol]["mean_latency_seconds"] == (30.0 + 90.5 + 60.5) / 3
     assert rows["../x"]["mean_latency_seconds"] is None
     assert rows["openai/gpt-5.5"]["mean_latency_seconds"] is None
 

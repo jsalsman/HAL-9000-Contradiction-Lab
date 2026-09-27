@@ -30,7 +30,7 @@ from hal.storage import StorageError, read_json, write_json
 
 # Shapes of stored IDs that may be turned into object names.
 _MODEL_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._:-]*")
-_SCENARIO_ID = re.compile(r"S\d{1,2}")
+_SCENARIO_ID = re.compile(r"S\d+")
 # A listing is reused for this long before the store is asked again.
 CACHE_SECONDS = 20.0
 MAX_SAMPLES = 5
