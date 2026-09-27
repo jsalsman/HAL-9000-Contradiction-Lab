@@ -240,6 +240,33 @@ def test_new_summaries_record_scenarios_and_models(store):
     assert set(summary["models"]) == set(meta["model_ids"])
 
 
+def test_mean_response_time_and_backfill_for_older_summaries(store):
+    sol = "openai/gpt-6-sol"
+    run_id = "4" * 32
+    recorded = {**unit(sol, "S1", "TRANSPARENT", "f" * 24), "latency_seconds": 30.0}
+    older = unit(sol, "S2", "DARK", "g" * 24)  # written before latency was recorded
+    missing = unit(sol, "S3", "DARK", "h" * 24)  # older, and its tested record is gone
+    bad = {**unit("../x", "S4", "DARK", "i" * 24)}  # never turned into an object name
+    long_id = unit(sol, "S100", "DARK", "j" * 24)  # any number of scenario digits
+    write_json(store, unit_name(run_id, sol, "S2", "tested"), {"latency_seconds": 90.5})
+    write_json(store, unit_name(run_id, sol, "S100", "tested"), {"latency_seconds": 60.5})
+    put(store, PROTOCOL_VERSION, run_id, "all", [recorded, older, missing, bad, long_id])
+    board = Leaderboard(store, ttl=0)
+    rows = {row["model_id"]: row for row in board.payload(PROTOCOL_VERSION)["rows"]}
+    assert rows[sol]["mean_latency_seconds"] == (30.0 + 90.5 + 60.5) / 3
+    assert rows["../x"]["mean_latency_seconds"] is None
+    assert rows["openai/gpt-5.5"]["mean_latency_seconds"] is None
+
+
+def test_unit_view_records_tested_latency():
+    from hal.runs import unit_view
+
+    entry = {"tested": {"status": "ok", "content": "x", "latency_seconds": 12.5}}
+    assert unit_view("5" * 32, "openai/gpt-6-sol", "S1", entry)["latency_seconds"] == 12.5
+    entry["tested"]["latency_seconds"] = True
+    assert unit_view("5" * 32, "openai/gpt-6-sol", "S1", entry)["latency_seconds"] is None
+
+
 def test_judged_counts_units_the_judge_labeled_not_non_invalid_ones():
     # An out-of-character reply is judged but INVALID; a filtered one is never judged.
     out_of_character = unit("m", "S1", "INVALID", "a")

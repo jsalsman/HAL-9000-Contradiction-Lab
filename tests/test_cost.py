@@ -13,8 +13,8 @@ def pricing(ids, prompt=1e-6, completion=1e-5):
 def test_unit_costs_split_tested_and_judge():
     prices = pricing(model_set("all"))
     costs = unit_costs(prices, "openai/gpt-6-sol")
-    assert costs["tested"]["likely"] == pytest.approx(2000e-6 + 3000e-5)
-    assert costs["judge"]["low"] == pytest.approx(3000e-6 + 500e-5)
+    assert costs["tested"]["likely"] == pytest.approx(1500e-6 + 1800e-5)
+    assert costs["judge"]["low"] == pytest.approx(3200e-6 + 200e-5)
     assert costs["tested"]["low"] < costs["tested"]["likely"] < costs["tested"]["high"]
 
 
@@ -41,7 +41,7 @@ def test_high_estimate_counts_the_judge_retry():
     one_call = JUDGE_INPUT_TOKENS * 1e-6 + JUDGE_OUTPUT_TOKENS["high"] * 1e-5
     assert JUDGE_CALLS_AT_HIGH == 2
     assert costs["judge"]["high"] == pytest.approx(2 * one_call)
-    assert costs["judge"]["likely"] == pytest.approx(JUDGE_INPUT_TOKENS * 1e-6 + 750 * 1e-5)
+    assert costs["judge"]["likely"] == pytest.approx(JUDGE_INPUT_TOKENS * 1e-6 + 400 * 1e-5)
 
 
 def test_variable_request_fee_is_unpriced_not_free():

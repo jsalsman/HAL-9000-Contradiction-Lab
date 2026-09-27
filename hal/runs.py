@@ -209,6 +209,13 @@ def unit_final(entry: dict) -> bool:
     return tested_final(entry) and judge_final(entry)
 
 
+def tested_latency(tested: dict | None) -> float | None:
+    """Return a tested record's wall-clock seconds, or None when absent or malformed."""
+    value = (tested or {}).get("latency_seconds")
+    ok = isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0
+    return value if ok else None
+
+
 def unit_view(run_id: str, model_id: str, scenario_id: str, entry: dict) -> dict:
     """Return the compact, text-free record of one unit for summaries and the grid."""
     tested, judge = entry.get("tested") or {}, entry.get("judge") or {}
@@ -232,6 +239,8 @@ def unit_view(run_id: str, model_id: str, scenario_id: str, entry: dict) -> dict
         "recognized": bool(terms),
         "recognized_in_reasoning": bool(source_terms(tested.get("reasoning"))),
         "reasoning_tokens": (tested.get("usage") or {}).get("reasoning_tokens"),
+        # Wall-clock seconds of the tested call, retries included; the judge is not timed.
+        "latency_seconds": tested_latency(tested),
         "cost_usd": round(sum(costs), 8) if costs else None,
         "final": unit_final(entry),
         "updated_at": judge.get("created_at") or tested.get("created_at"),

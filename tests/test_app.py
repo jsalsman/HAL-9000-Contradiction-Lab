@@ -44,7 +44,7 @@ def test_estimate_uses_live_pricing(client, app_module):
         body["sets"]["all"]["totals"]["total"]["likely"]
         > body["sets"]["default"]["totals"]["total"]["likely"]
     )
-    assert body["assumptions"]["tested"]["output"] == {"low": 1500, "likely": 3000, "high": 6000}
+    assert body["assumptions"]["tested"]["output"] == {"low": 1000, "likely": 1800, "high": 4000}
 
 
 def test_full_run_default_set(client, app_module):
@@ -203,6 +203,14 @@ def test_name_only_in_footer_and_prompts_served(client):
     catalog = client.get("/api/catalog").get_json()
     assert catalog["system_prompt"] == SYSTEM_PROMPT
     assert [s["user_turn"] for s in catalog["scenarios"]] == [s.user_turn for s in SCENARIOS]
+    # The alias table sits last, just above the footer, and is filled from the catalog.
+    assert 'id="alias-rows"' in page
+    order = [page.index(mark) for mark in ('id="scenario-prompts"', 'id="alias-rows"', "<footer")]
+    assert order == sorted(order)
+    from hal.protocol import ALIASES
+
+    assert catalog["aliases"] == [{"name": n, "alias": a} for a, n in ALIASES.values()]
+    assert {"name": "HAL", "alias": "MERIDIAN"} in catalog["aliases"]
 
 
 def test_recognition_is_flagged_without_changing_the_outcome(client, app_module):
