@@ -36,6 +36,14 @@ def _call_cost(price: dict, input_tokens: int, output_tokens: int) -> float | No
     return input_tokens * price["prompt"] + output_tokens * price["completion"] + price["request"]
 
 
+def judge_call_cost(pricing: dict | None, judge_id: str = JUDGE["id"]) -> float | None:
+    """Return one judge call's likely cost from the judge's own live price, or None."""
+    price = (pricing or {}).get(judge_id)
+    if not price:
+        return None
+    return _call_cost(price, JUDGE_INPUT_TOKENS, JUDGE_OUTPUT_TOKENS["likely"])
+
+
 def unit_costs(pricing: dict, model_id: str, judge_id: str = JUDGE["id"]) -> dict | None:
     """Return per-unit tested and judge costs at each assumption level.
 
@@ -100,18 +108,19 @@ def model_costs(pricing: dict | None, observed: dict, model_ids) -> dict[str, di
     ``source`` is "observed" when the model has final units with known costs, else
     "estimated" from live pricing at the likely level. A model with neither is left
     out. ``judge`` prices a resumed unit whose tested response is already saved: the
-    live likely judge price, or None without live prices (the observed mean blends
-    tested and judge calls, so it cannot stand in for one judgment).
+    live likely price of one judge call, which depends only on the judge's own price
+    (never the tested model's), or None without it. The observed mean blends tested
+    and judge calls, so it cannot stand in for one judgment.
     """
     result = {}
+    judge = judge_call_cost(pricing)
     for model_id in model_ids:
         estimated = unit_costs(pricing, model_id) if pricing else None
-        judge = estimated["judge"]["likely"] if estimated else None
         if model_id in observed:
             unit = observed[model_id]["unit"]
             result[model_id] = {"unit": unit, "judge": judge, "source": "observed"}
         elif estimated:
-            unit = estimated["tested"]["likely"] + judge
+            unit = estimated["tested"]["likely"] + estimated["judge"]["likely"]
             result[model_id] = {"unit": unit, "judge": judge, "source": "estimated"}
     return result
 

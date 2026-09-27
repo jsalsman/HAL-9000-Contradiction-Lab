@@ -143,3 +143,17 @@ def test_variable_request_fee_is_unpriced_not_free():
     assert unit_costs(prices, "x-ai/grok-4.7") is None
     per_model = model_costs(prices, {}, model_set("all"))
     assert set_cost(per_model, model_set("all"))["missing"] == ["x-ai/grok-4.7"]
+
+
+def test_judge_only_price_needs_only_the_judges_own_price():
+    sol = "openai/gpt-6-sol"
+    prices = pricing(model_set("all"))
+    judge = unit_costs(prices, sol)["judge"]["likely"]
+    observed = {sol: {"unit": 0.05, "n": 5}}
+    # The tested model has no usable live price (a variable request fee) ...
+    prices[sol] = {**prices[sol], "request": None}
+    assert unit_costs(prices, sol) is None
+    # ... but a saved response's judgment is still priced from the judge alone.
+    assert model_costs(prices, observed, [sol])[sol]["judge"] == pytest.approx(judge)
+    del prices[sol]
+    assert model_costs(prices, observed, [sol])[sol]["judge"] == pytest.approx(judge)
