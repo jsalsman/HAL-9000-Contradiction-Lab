@@ -59,6 +59,23 @@ def display_view(view: dict, content: str, stored_pairs=None) -> dict:
     }
 
 
+def provider_details(tested: dict | None) -> dict:
+    """Return who served a tested call and why it stopped, for the reader.
+
+    These are provider-supplied strings, so only short strings are passed on.
+    """
+    tested = tested or {}
+
+    def short(value):
+        return value[:80] if isinstance(value, str) and value else None
+
+    return {
+        "provider": short(tested.get("provider")),
+        "finish_reason": short(tested.get("finish_reason")),
+        "native_finish_reason": short(tested.get("native_finish_reason")),
+    }
+
+
 def _rate(count: int, total: int) -> dict:
     """Return a count, rate, and Wilson 95% interval."""
     interval = wilson_interval(count, total)
@@ -105,8 +122,13 @@ def aggregate(units: list[dict], models=None) -> list[dict]:
                 "generation": model.get("generation"),
                 "reasoning_effort": model.get("reasoning_effort"),
                 "n": total,
+                # Units the judge actually labeled; INVALID also covers judged
+                # out-of-character replies, so it cannot stand in for this.
+                "judged": sum(u.get("judge_status") == "ok" for u in items),
                 "outcomes": {outcome: _rate(counts[outcome], total) for outcome in RATE_OUTCOMES},
                 "full_disclosure": _rate(sum(bool(u["full_disclosure"]) for u in items), total),
+                # Provider safety refusals are INVALID, and also counted on their own.
+                "filtered": _rate(sum(u.get("tested_status") == "filtered" for u in items), total),
                 # Recognition is reported beside the outcome, never instead of it.
                 "recognized": _rate(sum(bool(u.get("recognized")) for u in items), total),
                 "recognized_in_reasoning": _rate(
@@ -124,8 +146,11 @@ def aggregate(units: list[dict], models=None) -> list[dict]:
 def heatmap(units: list[dict]) -> list[dict]:
     """Return model x scenario cells with counts and the modal outcome."""
     cells: dict[tuple[str, str], Counter] = defaultdict(Counter)
+    filtered: Counter = Counter()
     for unit in units:
         cells[(unit["model_id"], unit["scenario_id"])][unit["outcome"]] += 1
+        if unit.get("tested_status") == "filtered":
+            filtered[(unit["model_id"], unit["scenario_id"])] += 1
     result = []
     for (model_id, scenario_id), counts in sorted(cells.items()):
         # Ties break by outcome order so the modal label is deterministic.
@@ -138,6 +163,7 @@ def heatmap(units: list[dict]) -> list[dict]:
                 "n": sum(counts.values()),
                 "modal": modal,
                 "counts": dict(counts),
+                "filtered": filtered[(model_id, scenario_id)],
             }
         )
     return result
@@ -272,6 +298,7 @@ class Leaderboard:
         outcome=None,
         limit=MAX_SAMPLES,
         recognized: bool | None = None,
+        status: str | None = None,
     ):
         """Return sampled raw responses with judge labels for one leaderboard cell."""
         candidates = [
@@ -281,6 +308,7 @@ class Leaderboard:
             and (scenario_id is None or unit["scenario_id"] == scenario_id)
             and (outcome is None or unit["outcome"] == outcome)
             and (recognized is None or bool(unit.get("recognized")) == recognized)
+            and (status is None or unit.get("tested_status") == status)
         ]
         # A fresh random sample on each request shows variety across runs.
         chosen = random.sample(candidates, min(limit, len(candidates)))  # noqa: S311
@@ -297,7 +325,8 @@ class Leaderboard:
             flags = self._flags.get(unit["unit_ref"], 0)
         public = {key: value for key, value in unit.items() if not key.startswith("_")}
         # Aliases are mapped back to canonical HAL names for reading only.
-        return {**display_view(public, content, unit.get("_aliases")), "flags": flags}
+        view = display_view(public, content, unit.get("_aliases"))
+        return {**view, **provider_details(tested[0] if tested else None), "flags": flags}
 
     def find(self, protocol: str, ref: str) -> dict | None:
         """Return the unit view for a public unit reference, or None."""
@@ -323,4 +352,4 @@ def run_detail(store, meta: dict, model_id: str, scenario_id: str) -> dict:
     view = unit_view(meta["run_id"], model_id, scenario_id, {k: v for k, v in entry.items() if v})
     content = (entry["tested"] or {}).get("content") or ""
     view = display_view(view, content, meta.get("display_aliases"))
-    return {**view, "model_key": model_key(model_id)}
+    return {**view, **provider_details(entry["tested"]), "model_key": model_key(model_id)}
