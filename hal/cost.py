@@ -68,18 +68,24 @@ def observed_costs(units: list[dict]) -> dict[str, dict]:
     """Return each model's mean observed cost per final unit, tests and judging combined.
 
     A refused unit with no reported cost was declined by the provider, which bills
-    nothing for it, so it counts as zero. A unit with a timed-out stage is left out
-    even when part of its cost is known, because the stage that ran to its deadline
-    may have been billed without reporting a cost; so is any other unit with an
-    unknown charge. Neither lowers the mean or makes a model look free.
+    nothing for it, so it counts as zero. A unit whose total is incomplete is left
+    out even when part of its cost is known: a timed-out stage (which may have been
+    billed without reporting a cost), a paid call whose usage lacked a cost, or an
+    ok unit whose completeness is unknown. None of these lowers the mean or makes
+    a model look free.
     """
     by_model: dict[str, list[float]] = defaultdict(list)
     for unit in units:
-        if "timeout" in (unit.get("tested_status"), unit.get("judge_status")):
+        # cost_complete says whether every paid call reported its cost; the
+        # leaderboard fills it in for older summaries from the stored records.
+        complete = unit.get("cost_complete")
+        if complete is False or "timeout" in (unit.get("tested_status"), unit.get("judge_status")):
             continue
         cost = unit.get("cost_usd")
         if isinstance(cost, (int, float)) and not isinstance(cost, bool) and cost >= 0:
-            by_model[unit["model_id"]].append(cost)
+            if complete is True or unit.get("tested_status") != "ok":
+                by_model[unit["model_id"]].append(cost)
+            # An ok unit of unknown completeness may be missing its judge share.
         elif unit.get("tested_status") in UNBILLED_STATUSES:
             by_model[unit["model_id"]].append(0.0)
     return {

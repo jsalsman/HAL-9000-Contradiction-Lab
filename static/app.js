@@ -166,6 +166,7 @@
   /**
    * Show each model set's observed cost under its radio button, and a note for a
    * resumed run, for models priced from live rates, or for missing prices.
+   * @returns {boolean} Whether the selected set (or resume) is fully priced.
    */
   function renderEstimate() {
     const box = document.querySelector("#estimate");
@@ -177,6 +178,7 @@
       cell.classList.toggle("selected", name === selected);
     }
     const notes = [];
+    let priced = false;
     if (!estimates) {
       notes.push(el("p", {class:"error", text:"Costs are unavailable right now, so a run cannot be confirmed. Reload to try again."}));
       confirmButton.disabled = true;
@@ -198,7 +200,8 @@
           total += cost;
         }
         const count = resumeInfo.remaining.length;
-        notes.push(el("p", {}, el("strong", {text:`Resuming: ${dollars(total)}`}),
+        // A partial sum would read as a real price, so show none when anything is unpriced.
+        notes.push(el("p", {}, el("strong", {text:`Resuming: ${missing.length ? "not yet priced" : dollars(total)}`}),
           ` for the ${count} remaining unit${count === 1 ? "" : "s"}.`));
       }
       if (set.estimated.length) {
@@ -208,9 +211,11 @@
         notes.push(el("p", {class:"error", text:`No observed cost or live price for: ${missing.join(", ")}. The run cannot be confirmed until OpenRouter lists a price.`}));
         confirmButton.disabled = true;
       }
+      priced = missing.length === 0;
     }
     box.replaceChildren(...notes);
     box.hidden = notes.length === 0;
+    return priced;
   }
 
   /** Label the radio buttons from the catalog so counts always match the pinned models. */
@@ -240,7 +245,11 @@
       if (run.resuming) {
         // The run is identified by this key and set, so starting picks it up where it stopped.
         resumeInfo = run;
-        renderEstimate();
+        if (!renderEstimate()) {
+          // The resume needs a price the page does not have; never enable the run.
+          runStatus.textContent = "This run cannot be resumed until its remaining units are priced; see the note above.";
+          return;
+        }
         plan = `This key and model set have an unfinished run: ${run.completed} of ${run.total} units are done, so starting resumes it and pays only for the ${run.remaining.length} remaining units (the cost shown above now covers only those).`;
         try {
           const info = await getJSON(`/api/runs/${run.run_id}`);

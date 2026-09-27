@@ -24,7 +24,15 @@ from hal.protocol import (
     display_segments,
     display_text,
 )
-from hal.runs import RUN_ID, model_key, now_iso, tested_latency, unit_name, unit_view
+from hal.runs import (
+    RUN_ID,
+    cost_complete,
+    model_key,
+    now_iso,
+    tested_latency,
+    unit_name,
+    unit_view,
+)
 from hal.stats import wilson_interval
 from hal.storage import StorageError, read_json, write_json
 
@@ -205,7 +213,7 @@ class Leaderboard:
                     # One damaged summary must not hide every other run.
                     continue
                 if found and isinstance(found[0], dict):
-                    self._backfill_latency(name, found[0])
+                    self._backfill_unit_fields(name, found[0])
                     self._summaries[name] = (found[1], found[0])
             # Flags are counted per public unit reference.
             self._flags = Counter(
@@ -213,8 +221,8 @@ class Leaderboard:
             )
             self._listed_at = time.monotonic()
 
-    def _backfill_latency(self, name: str, summary: dict) -> None:
-        """Fill in tested-call latency for summaries written before it was recorded.
+    def _backfill_unit_fields(self, name: str, summary: dict) -> None:
+        """Fill in latency and cost completeness for summaries written before them.
 
         Runs once per summary version, in memory only; the stored summary is not
         rewritten (each run writes only its own objects, and only while it runs).
@@ -224,10 +232,12 @@ class Leaderboard:
             return
         run_id = parts[2].removesuffix(".json")
         for unit in summary.get("units") or []:
-            if not isinstance(unit, dict) or "latency_seconds" in unit:
+            if not isinstance(unit, dict):
+                continue
+            if "latency_seconds" in unit and "cost_complete" in unit:
                 continue
             model_id, scenario_id = unit.get("model_id"), unit.get("scenario_id")
-            tested = None
+            entry: dict = {}
             # Stored IDs become object names, so only well-formed ones are read.
             if (
                 RUN_ID.fullmatch(run_id)
@@ -236,13 +246,17 @@ class Leaderboard:
                 and isinstance(scenario_id, str)
                 and _SCENARIO_ID.fullmatch(scenario_id)
             ):
-                record = unit_name(run_id, model_id, scenario_id, "tested")
-                try:
-                    found = read_json(self.store, record)
-                    tested = found[0] if found else None
-                except (StorageError, ValueError):
-                    tested = None
-            unit["latency_seconds"] = tested_latency(tested if isinstance(tested, dict) else None)
+                for stage in ("tested", "judge"):
+                    record = unit_name(run_id, model_id, scenario_id, stage)
+                    try:
+                        found = read_json(self.store, record)
+                    except (StorageError, ValueError):
+                        found = None
+                    if found and isinstance(found[0], dict):
+                        entry[stage] = found[0]
+            unit.setdefault("latency_seconds", tested_latency(entry.get("tested")))
+            # Unreadable records leave the unit's cost unknown, so it stays out of means.
+            unit.setdefault("cost_complete", cost_complete(entry))
 
     def invalidate(self) -> None:
         """Force the next read to re-list the store (after a local run writes)."""

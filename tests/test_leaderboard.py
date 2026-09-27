@@ -258,6 +258,25 @@ def test_mean_response_time_and_backfill_for_older_summaries(store):
     assert rows["openai/gpt-5.5"]["mean_latency_seconds"] is None
 
 
+def test_cost_completeness_is_backfilled_for_older_summaries(store):
+    sol = "openai/gpt-6-sol"
+    run_id = "6" * 32
+    paid = {"status": "ok", "usage": {"cost": 0.01}, "latency_seconds": 5.0}
+    write_json(store, unit_name(run_id, sol, "S1", "tested"), paid)
+    write_json(
+        store,
+        unit_name(run_id, sol, "S1", "judge"),
+        {"status": "ok", "calls": [{"usage": {"cost": 0.002}}]},
+    )
+    # S2's judge record is missing, so its total is unknown.
+    write_json(store, unit_name(run_id, sol, "S2", "tested"), paid)
+    older = [unit(sol, "S1", "DARK", "k" * 24), unit(sol, "S2", "DARK", "l" * 24)]
+    put(store, PROTOCOL_VERSION, run_id, "all", older)
+    units = {u["scenario_id"]: u for u in Leaderboard(store, ttl=0).units(PROTOCOL_VERSION)}
+    assert units["S1"]["cost_complete"] is True and units["S2"]["cost_complete"] is False
+    assert units["S1"]["latency_seconds"] == 5.0
+
+
 def test_unit_view_records_tested_latency():
     from hal.runs import unit_view
 

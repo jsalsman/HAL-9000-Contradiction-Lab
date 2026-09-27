@@ -18,8 +18,14 @@ def test_unit_costs_split_tested_and_judge():
     assert costs["tested"]["low"] < costs["tested"]["likely"] < costs["tested"]["high"]
 
 
-def unit(model_id, cost, status="ok", judge="ok"):
-    return {"model_id": model_id, "cost_usd": cost, "tested_status": status, "judge_status": judge}
+def unit(model_id, cost, status="ok", judge="ok", complete=True):
+    return {
+        "model_id": model_id,
+        "cost_usd": cost,
+        "tested_status": status,
+        "judge_status": judge,
+        "cost_complete": complete,
+    }
 
 
 def test_observed_costs_average_known_charges_only():
@@ -30,17 +36,47 @@ def test_observed_costs_average_known_charges_only():
         # A refusal message in place of a reply is not billed: it counts as zero.
         unit(sol, None, "refused"),
         # A filter stop without a refusal message is not known to be unbilled.
-        unit(sol, None, "filtered"),
+        unit(sol, None, "filtered", complete=False),
         # A timeout may have been billed, so its unknown charge is left out,
-        unit(sol, None, "timeout"),
-        unit(astra, None, "timeout"),
-        # even when the other stage's cost is known (only the tested share here).
-        unit(sol, 0.001, "ok", judge="timeout"),
+        unit(sol, None, "timeout", complete=False),
+        unit(astra, None, "timeout", complete=False),
+        # even when the other stage's cost is known (only the tested share here),
+        unit(sol, 0.001, "ok", judge="timeout", complete=False),
+        # and so is a paid call whose usage lacked a cost.
+        unit(sol, 0.001, "ok", complete=False),
     ]
     observed = observed_costs(units)
     assert observed[sol] == {"unit": pytest.approx(0.02), "n": 3}
     # A model with only unknown charges is not advertised as free.
     assert astra not in observed
+
+
+def test_units_without_the_completeness_flag_use_only_what_is_certain():
+    sol = "openai/gpt-6-sol"
+    units = [unit(sol, 0.03, "empty"), unit(sol, None, "refused"), unit(sol, 0.001)]
+    for item in units:
+        del item["cost_complete"]
+    # An ok unit of unknown completeness may lack its judge share, so it is left out.
+    assert observed_costs(units)[sol] == {"unit": pytest.approx(0.015), "n": 2}
+
+
+def test_cost_complete_requires_every_paid_call_to_report_a_cost():
+    from hal.runs import cost_complete
+
+    def entry(status="ok", tested_cost=0.01, judge_status="ok", judge_costs=(0.002,)):
+        calls = [{"usage": {"cost": c}} for c in judge_costs]
+        judge = {"status": judge_status, "calls": calls} if judge_status else None
+        return {"tested": {"status": status, "usage": {"cost": tested_cost}}, "judge": judge}
+
+    assert cost_complete(entry())
+    assert cost_complete(entry(judge_costs=(0.002, 0.003)))  # one paid retry
+    assert not cost_complete(entry(judge_costs=(0.002, None)))  # a retry lacked its cost
+    assert not cost_complete(entry(tested_cost=None))
+    assert not cost_complete(entry(judge_status="timeout", judge_costs=()))
+    assert not cost_complete(entry(status="timeout", tested_cost=None, judge_status=None))
+    assert cost_complete(entry(status="refused", tested_cost=None, judge_status=None))
+    assert not cost_complete(entry(status="filtered", tested_cost=None, judge_status=None))
+    assert cost_complete(entry(status="truncated", judge_status=None))
 
 
 def test_set_cost_prefers_observed_and_falls_back_to_live_prices():
