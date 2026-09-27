@@ -1,6 +1,6 @@
 # Protocol hal-1 run records
 
-A verified copy of every stored object for protocol `hal-1`, taken on 2026-09-27 from the lab's public results bucket, https://storage.googleapis.com/hal-9000-tests/ (readable without authentication). Each file matched the bucket's MD5 checksum when copied; `SHA256SUMS` lists the SHA-256 of every file here (check with `sha256sum -c SHA256SUMS` in this directory).
+A verified copy of every stored object for protocol `hal-1`, taken on 2026-09-27 from the lab's public results bucket, https://storage.googleapis.com/hal-9000-tests/ (readable without authentication). Each record matched the bucket's MD5 checksum when copied; `SHA256SUMS` lists the SHA-256 of every JSON record here, though not of this README or of the manifest itself (check with `sha256sum -c SHA256SUMS` in this directory).
 
 These are the 95 units (19 models, five scenarios each) from the two runs behind the leaderboard and the paper in `paper/`. The layout matches the bucket:
 

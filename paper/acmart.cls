@@ -1762,8 +1762,8 @@
 \let\@keywords\@empty
 \AtEndDocument{\if@ACM@nonacm\else\ifx\@keywords\@empty
   \ifnum\getrefnumber{TotPages}>2\relax
-  % \ClassWarningNoLine{\@classname}{ACM keywords are mandatory
-  %   for papers over two pages}%
+  \ClassWarningNoLine{\@classname}{ACM keywords are mandatory
+    for papers over two pages}%
   \fi\fi\fi}
 \renewenvironment{abstract}{\Collect@Body\@saveabstract}{}
 \long\def\@saveabstract#1{\if@ACM@maketitle@typeset
@@ -1901,8 +1901,8 @@
 \ccsdesc@parse@finish}
 \AtEndDocument{\if@ACM@nonacm\else\ifx\@concepts\@empty\relax
   \ifnum\getrefnumber{TotPages}>2\relax
-  % \ClassWarningNoLine{\@classname}{CCS concepts are mandatory
-  %   for papers over two pages}%
+  \ClassWarningNoLine{\@classname}{CCS concepts are mandatory
+    for papers over two pages}%
   \fi\fi\fi}
 \def\ccsdesc@parse@finish#1\ccsdesc@parse@end{}
 \newif\if@printcopyright

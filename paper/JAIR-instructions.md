@@ -4,7 +4,7 @@
 
 ## Build
 
-The Author Kit's class files are kept beside the source in this directory: `jair.cls`, `acmart.cls`, `acmauthoryear.bbx`, `acmauthoryear.cbx`, and `acmdatamodel.dbx`. The bibliography is embedded in the `.tex` file and written out as `jair-submission.bib` on the first pass.
+The Author Kit's class files are kept beside the source in this directory: `jair.cls`, `acmart.cls`, `acmauthoryear.bbx`, `acmauthoryear.cbx`, and `acmdatamodel.dbx`. `acmart.cls` is the unmodified acmart v2.12 (2024/12/28) generated from `acmart.dtx` with `acmart.ins`, both included here as its LaTeX Project Public License requires for redistributing a generated file. The Author Kit's own copy of `acmart.cls` is that same version with two warnings commented out (that ACM keywords and CCS concepts are mandatory), which the license does not allow under the original file name, so this directory uses the unmodified class. The output is the same. The three biblatex files are identical to acmart v2.12's. The bibliography is embedded in the `.tex` file and written out as `jair-submission.bib` on the first pass.
 
 ```sh
 cd paper
@@ -14,7 +14,7 @@ pdflatex jair-submission.tex
 pdflatex jair-submission.tex
 ```
 
-It needs a TeX Live installation with the Libertine, newtx, and Inconsolata fonts, `biblatex`, `biber`, `pgfplots`, and `listings` (on Debian or Ubuntu: `texlive-latex-extra`, `texlive-fonts-extra`, `texlive-pictures`, `texlive-bibtex-extra`, `texlive-plain-generic`, and `biber`). The template can also be opened on [Overleaf](https://www.overleaf.com/read/hycbzkdksrzz#8106d4). The build should finish with no errors and no undefined references; the only expected warnings are that `jair-submission.bib` was written and that the affiliation has no city.
+It needs a TeX Live installation with the Libertine, newtx, and Inconsolata fonts, `biblatex`, `biber`, `pgfplots`, and `listings` (on Debian or Ubuntu: `texlive-latex-extra`, `texlive-fonts-extra`, `texlive-pictures`, `texlive-bibtex-extra`, `texlive-plain-generic`, and `biber`). The template can also be opened on [Overleaf](https://www.overleaf.com/read/hycbzkdksrzz#8106d4). The build should finish with no errors and no undefined references; the only expected warnings are that `jair-submission.bib` was written, that the affiliation has no city, and acmart's notes that ACM keywords and CCS concepts are mandatory, which do not apply to JAIR (its template says to omit both).
 
 Do not commit the PDF or build output; `.gitignore` excludes them.
 
