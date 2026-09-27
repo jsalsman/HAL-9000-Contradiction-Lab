@@ -7,11 +7,15 @@ includes them.
 
 from hal.catalog import JUDGE, UNITS_PER_MODEL
 
-# Token assumptions per call, shown verbatim beside the estimate.
-TESTED_INPUT_TOKENS = 2000
-TESTED_OUTPUT_TOKENS = {"low": 1500, "likely": 3000, "high": 6000}
-JUDGE_INPUT_TOKENS = 3000
-JUDGE_OUTPUT_TOKENS = {"low": 500, "likely": 750, "high": 1200}
+# Token assumptions per call, shown verbatim beside the estimate. Calibrated on
+# 2026-09-27 against a full run of all 19 models that cost about $4.75, and against
+# measured calls: tested prompts were about 1,400-1,500 tokens with 1,000-1,900
+# output tokens including reasoning; low-effort judge calls read about 2,900-3,500
+# tokens and wrote 180-600.
+TESTED_INPUT_TOKENS = 1500
+TESTED_OUTPUT_TOKENS = {"low": 1000, "likely": 1800, "high": 4000}
+JUDGE_INPUT_TOKENS = 3200
+JUDGE_OUTPUT_TOKENS = {"low": 200, "likely": 400, "high": 800}
 LEVELS = ("low", "likely", "high")
 # The high estimate assumes every judgment needs its one allowed retry.
 JUDGE_CALLS_AT_HIGH = 2

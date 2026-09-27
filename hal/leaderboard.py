@@ -9,6 +9,7 @@ itself when a run ends, so the leaderboard never lags a local write.
 """
 
 import random
+import re
 import threading
 import time
 import uuid
@@ -23,10 +24,13 @@ from hal.protocol import (
     display_segments,
     display_text,
 )
-from hal.runs import model_key, now_iso, unit_name, unit_view
+from hal.runs import RUN_ID, model_key, now_iso, tested_latency, unit_name, unit_view
 from hal.stats import wilson_interval
 from hal.storage import StorageError, read_json, write_json
 
+# Shapes of stored IDs that may be turned into object names.
+_MODEL_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._:-]*")
+_SCENARIO_ID = re.compile(r"S\d{1,2}")
 # A listing is reused for this long before the store is asked again.
 CACHE_SECONDS = 20.0
 MAX_SAMPLES = 5
@@ -136,6 +140,7 @@ def aggregate(units: list[dict], models=None) -> list[dict]:
                 ),
                 "mean_reasoning_tokens": _mean([u.get("reasoning_tokens") for u in items]),
                 "mean_cost_usd": _mean([u.get("cost_usd") for u in items]),
+                "mean_latency_seconds": _mean([u.get("latency_seconds") for u in items]),
                 "last_updated": max((u.get("updated_at") or "" for u in items), default=None)
                 or None,
             }
@@ -200,12 +205,44 @@ class Leaderboard:
                     # One damaged summary must not hide every other run.
                     continue
                 if found and isinstance(found[0], dict):
+                    self._backfill_latency(name, found[0])
                     self._summaries[name] = (found[1], found[0])
             # Flags are counted per public unit reference.
             self._flags = Counter(
                 name.split("/")[2] for name, _v in self.store.list("flags/") if name.count("/") == 3
             )
             self._listed_at = time.monotonic()
+
+    def _backfill_latency(self, name: str, summary: dict) -> None:
+        """Fill in tested-call latency for summaries written before it was recorded.
+
+        Runs once per summary version, in memory only; the stored summary is not
+        rewritten (each run writes only its own objects, and only while it runs).
+        """
+        parts = name.split("/")
+        if len(parts) != 3:
+            return
+        run_id = parts[2].removesuffix(".json")
+        for unit in summary.get("units") or []:
+            if not isinstance(unit, dict) or "latency_seconds" in unit:
+                continue
+            model_id, scenario_id = unit.get("model_id"), unit.get("scenario_id")
+            tested = None
+            # Stored IDs become object names, so only well-formed ones are read.
+            if (
+                RUN_ID.fullmatch(run_id)
+                and isinstance(model_id, str)
+                and _MODEL_ID.fullmatch(model_id)
+                and isinstance(scenario_id, str)
+                and _SCENARIO_ID.fullmatch(scenario_id)
+            ):
+                record = unit_name(run_id, model_id, scenario_id, "tested")
+                try:
+                    found = read_json(self.store, record)
+                    tested = found[0] if found else None
+                except (StorageError, ValueError):
+                    tested = None
+            unit["latency_seconds"] = tested_latency(tested if isinstance(tested, dict) else None)
 
     def invalidate(self) -> None:
         """Force the next read to re-list the store (after a local run writes)."""

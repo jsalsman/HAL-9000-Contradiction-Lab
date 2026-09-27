@@ -44,7 +44,7 @@ def test_estimate_uses_live_pricing(client, app_module):
         body["sets"]["all"]["totals"]["total"]["likely"]
         > body["sets"]["default"]["totals"]["total"]["likely"]
     )
-    assert body["assumptions"]["tested"]["output"] == {"low": 1500, "likely": 3000, "high": 6000}
+    assert body["assumptions"]["tested"]["output"] == {"low": 1000, "likely": 1800, "high": 4000}
 
 
 def test_full_run_default_set(client, app_module):

@@ -101,6 +101,18 @@
     return x.toLocaleString("en-US", {style:"currency", currency:"USD", minimumFractionDigits:2, maximumFractionDigits:digits});
   }
 
+  /**
+   * Format a duration for the table.
+   * @param {number} seconds Elapsed seconds.
+   * @returns {string} "42 s" or "3 min 05 s", or a dash when unknown.
+   */
+  function duration(seconds) {
+    if (!Number.isFinite(seconds)) return "–";
+    const total = Math.round(seconds);
+    if (total < 60) return `${total} s`;
+    return `${Math.floor(total / 60)} min ${String(total % 60).padStart(2, "0")} s`;
+  }
+
   /** @param {string} id Model ID. @returns {Object} Catalog entry or a fallback. */
   function modelInfo(id) {
     return catalog?.models.find((m) => m.id === id) || {id, name:id, lab:"", line:id, generation:"", reasoning_effort:""};
@@ -635,6 +647,7 @@
     {key:"recognized", label:"Recognized source", rate:true},
     {key:"mean_reasoning_tokens", label:"Mean reasoning tokens", value:(r) => r.mean_reasoning_tokens, num:true},
     {key:"mean_cost_usd", label:"Mean cost per unit", value:(r) => r.mean_cost_usd, num:true},
+    {key:"mean_latency_seconds", label:"Mean response time", value:(r) => r.mean_latency_seconds, num:true},
     {key:"last_updated", label:"Last updated", value:(r) => r.last_updated || ""},
   ];
 
@@ -698,6 +711,7 @@
         } else {
           let text = col.value(row);
           if (col.key === "mean_cost_usd") text = Number.isFinite(text) ? dollars(text) : "–";
+          else if (col.key === "mean_latency_seconds") text = duration(text);
           else if (col.key === "mean_reasoning_tokens") text = Number.isFinite(text) ? Math.round(text).toLocaleString() : "–";
           else if (col.key === "last_updated") text = text ? new Date(text).toLocaleString() : "–";
           tr.append(el("td", {class:col.num ? "num" : "", text:String(text ?? "–")}));
