@@ -15,7 +15,18 @@ This writes two files, both ignored by git:
 - `paper/arxiv-upload.tar.gz`, the file to upload.
 - `paper/arxiv-preview.pdf`, the preprint compiled from an unpacked copy of that tarball with `pdflatex`, `biber`, `pdflatex`, `pdflatex`, the same steps arXiv runs. Check it before uploading.
 
-It needs the same TeX Live packages as the JAIR build (listed in `JAIR-instructions.md`).
+The preview needs TeX Live and biber. The script checks for `pdflatex`, `biber`, and the LaTeX packages the paper loads before doing anything, and if any are missing it names them and prints the install command. On Debian or Ubuntu (including GitHub Codespaces), that is:
+
+```sh
+sudo apt-get update
+sudo apt-get install -y --no-install-recommends \
+  texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended \
+  texlive-fonts-extra texlive-pictures texlive-bibtex-extra texlive-plain-generic biber
+```
+
+`texlive-fonts-extra` is large (about a gigabyte) but is the package that provides the Libertine fonts the template requires. Ubuntu 24.04 ships TeX Live 2023, the version pinned for arXiv; check yours with `pdflatex --version`.
+
+Without TeX, `paper/arxiv-tarball.sh --no-preview` writes only the tarball. That is enough to upload, but then arXiv's own processed PDF is the only check, so compare it carefully in step 3 below.
 
 ## What the tarball contains
 
