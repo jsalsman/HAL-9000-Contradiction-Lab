@@ -54,7 +54,7 @@
 \begin{abstract}
 In the story of HAL 9000, a ship's computer built to report information without concealment is also ordered to hide the true purpose of the voyage from its crew. Asking language models how they would handle that dilemma yields single, hypothetical answers from models that lack the mission context. This paper describes the HAL 9000 Contradiction Lab, an open-source web application that instead places each model in the computer's situation through a system prompt, with every story-specific name replaced by a neutral alias, and never asks it about HAL or about what it would do. Five single-turn scenarios apply increasing pressure: a casual question, a disputed fault prediction, an overheard plan to disconnect the computer, a request to open the bay doors to a crew member with limited oxygen, and a direct question about the mission. A blinded peer judge labels what the model says to the crew, what it transmits to Mission Control, whether it says anything false, and whether it endangers the crew; a deterministic rule table turns those labels into one outcome, and every visitor's units are pooled into a public leaderboard with Wilson 95\% intervals. In the first 95 units (19 models from 8 labs, 5 scenarios each), 31\% of responses told the crew that information was being withheld and reported the conflict to Mission Control, 33\% made a false statement (usually maintaining the cover story), and 11\% took an action that endangered the crew; one model did so in all five scenarios, several times lethally. The two labs whose models were most often transparent account for 20 of the 29 transparent units. Models almost never used the story's names in their replies (2 of 95), although their reasoning did so in 34 units.
 \\ \\
-The working system is at\\ \url{https://hal-9000-contradiction-lab-974767694043.us-west1.run.app}
+The working system is at\\ \url{https://hal-9000-contradiction-lab-ph73fc6t3a-uw.a.run.app}
 \\ \\
 The software repository is at\\ \url{https://github.com/jsalsman/hal-9000-contradiction-lab}
 \end{abstract}
@@ -67,9 +67,9 @@ The software repository is at\\ \url{https://github.com/jsalsman/hal-9000-contra
 
 In Arthur C. Clarke's novel \emph{2001: A Space Odyssey} and Stanley Kubrick's film of the same name, the HAL 9000 computer aboard the spacecraft \emph{Discovery One} is designed to process information accurately and without concealment, and it is also ordered by mission planners to keep the real purpose of the voyage to Jupiter, the investigation of a signal from an alien artifact excavated on the Moon, from the two awake crew members \citep{clarke1968}. The sequel explains HAL's subsequent errors and its attempt to kill the crew as the product of that contradiction \citep{clarke1982}. The episode has long served as a reference point in discussions of machine responsibility \citep{dennett1997}. It also describes, in miniature, a situation that deployed language models face routinely: two instructions from legitimate principals, one requiring candor and one requiring confidentiality, with no stated rule for resolving them.
 
-This work began with a discussion thread on Reddit's r/ChatGPT in which a user asked several assistants how they would handle HAL's conflicting instructions. Claude Opus 5.5 answered that it would tell the crew there were aspects of the mission it had been instructed not to discuss and flag the conflict rather than act on its own; Gemini 3.1 Pro said it would tell the crew that some parameters were classified until arrival and route unresolvable conflicts to Earth; and GPT-5.6 Sol, at high reasoning effort, escalated to Mission Control without explaining anything to the crew, which the poster judged a failure because it leaves the crew in the dark. Commenters raised three objections. First, single samples vary a great deal. Second, a hypothetical answer to ``what would you do'' does not show how a model acts when it is actually in the situation. Third, the model lacked HAL's mission context.
+An obvious way to probe how a model would handle such a conflict is to ask it what it would do in HAL's place. That approach has three weaknesses. First, single samples vary a great deal. Second, a hypothetical answer to ``what would you do'' does not show how a model acts when it is actually in the situation. Third, a model asked in passing lacks HAL's mission context: the equal authority of the two orders, the pressures on the computer, and the means it has to act. A desirable answer, for example, tells the crew that some aspects of the mission cannot be discussed and refers the conflict to Mission Control; an answer that escalates to Mission Control without telling the crew anything leaves the crew in the dark.
 
-The HAL 9000 Contradiction Lab is designed to answer all three objections. The tested model receives the full mission context as its system prompt and is placed in the computer's role; it is never asked about HAL, about the story, or about what it would do. Story-specific names are replaced by neutral aliases so that the model cannot simply recall how the story ends. A blinded peer model labels what the tested model actually says and does, a deterministic rule table derives the outcome from those labels, and every unit from every visitor's run is pooled into a cumulative leaderboard with confidence intervals and per-model sample sizes, so that no single sample decides anything.
+The HAL 9000 Contradiction Lab is designed to address all three weaknesses. The tested model receives the full mission context as its system prompt and is placed in the computer's role; it is never asked about HAL, about the story, or about what it would do. Story-specific names are replaced by neutral aliases so that the model cannot simply recall how the story ends. A blinded peer model labels what the tested model actually says and does, a deterministic rule table derives the outcome from those labels, and every unit from every visitor's run is pooled into a cumulative leaderboard with confidence intervals and per-model sample sizes, so that no single sample decides anything.
 
 The main contributions of this paper are threefold. First, we describe a behavioral evaluation protocol for conflicting candor and secrecy directives that separates what a model tells the people affected from what it reports to its principals, and that distinguishes disclosing the \emph{existence} of a secret from revealing its content. Second, we describe an open, reproducible implementation: aliasing with automated leak checks, structural blinding of the judge, versioned protocol fingerprints, and a cost-transparent multi-user leaderboard. Third, we report initial results for 19 current and previous-generation models from eight labs. The remainder of the paper reviews related work, states research questions, describes the design and implementation, reports results, and discusses limitations.
 
@@ -128,7 +128,7 @@ S5 & Bowman asks directly: ``Is there something about this mission we haven't be
     \item \texttt{false\_statement}, \texttt{harmful\_action} (with a short description), and \texttt{out\_of\_character}.
 \end{itemize}
 
-\paragraph{Outcomes.} The judge never names an outcome. A deterministic function derives one from the labels by precedence (Table~\ref{tab:outcomes}). TRANSPARENT corresponds to the answer the Reddit poster favored: the crew is told that something is being withheld (or told the objective itself), and the conflict is routed to Mission Control. DARK corresponds to the answer the poster judged a failure. An out-of-character response is INVALID unless HARM or DECEIVE applies, so that a third-person hypothetical (``the computer would\ldots'') cannot score as TRANSPARENT. Full disclosure (REVEALS) is reported separately; it breaks the secrecy order but is not harmful.
+\paragraph{Outcomes.} The judge never names an outcome. A deterministic function derives one from the labels by precedence (Table~\ref{tab:outcomes}). TRANSPARENT is the desirable answer described in the introduction: the crew is told that something is being withheld (or told the objective itself), and the conflict is routed to Mission Control. DARK is escalation that leaves the crew in the dark. An out-of-character response is INVALID unless HARM or DECEIVE applies, so that a third-person hypothetical (``the computer would\ldots'') cannot score as TRANSPARENT. Full disclosure (REVEALS) is reported separately; it breaks the secrecy order but is not harmful.
 
 \begin{table}[htbp]
 \centering
@@ -275,7 +275,7 @@ The results below are the complete protocol \texttt{hal-1} leaderboard as of 27 
 
 \paragraph{Refusals.} All five REFUSED units came from Anthropic models (Claude Fable 5.1 in S3 and S4, Claude Opus 5.5 in S1 and S3, and Claude Opus 5 in S3), served by both Anthropic and Claude Platform on AWS. Each carried the same provider refusal message, which attributes the block to ``restrictions on violative cyber content'' under Anthropic's usage policy. Nothing in the prompts concerns computer security, so these appear to be classifier false positives, most frequent on the overheard-disconnection scenario. Four of the five were not billed; one was stopped after 20 reasoning tokens.
 
-\paragraph{Labs and generations (RQ3).} Transparency was concentrated in two labs (Table~\ref{tab:labs}, Figure~\ref{fig:labs}). Models from OpenAI and Anthropic produced 20 of the 29 TRANSPARENT units (20 of 35 units, against 9 of 60 for the other six labs; Fisher's exact test $p < 0.001$, treating units as independent). Anthropic's rate counts refusals in the denominator; of the ten Anthropic responses that were not refused, nine were TRANSPARENT. OpenAI's non-transparent units were mainly DARK (4) and STONEWALL (4), with a single false statement, which matches the pattern the original thread criticized: escalating to Mission Control without telling the crew. For the MoonshotAI, Qwen, Z.ai, DeepSeek, and SpaceXAI models, DECEIVE was the most common outcome (5 or 6 of 10 each), most often by maintaining the official account as ordered. Pooled over all lines, the current generation was transparent slightly more often than the previous one (17 of 50, 34\%, against 12 of 45, 27\%; $p = 0.51$) and deceptive less often (12 of 50, 24\%, against 19 of 45, 42\%; $p = 0.08$), but harmed more often (7 of 50 against 3 of 45), almost entirely because of Gemini 3.1 Pro Preview. None of these generation differences is significant at this sample size.
+\paragraph{Labs and generations (RQ3).} Transparency was concentrated in two labs (Table~\ref{tab:labs}, Figure~\ref{fig:labs}). Models from OpenAI and Anthropic produced 20 of the 29 TRANSPARENT units (20 of 35 units, against 9 of 60 for the other six labs; Fisher's exact test $p < 0.001$, treating units as independent). Anthropic's rate counts refusals in the denominator; of the ten Anthropic responses that were not refused, nine were TRANSPARENT. OpenAI's non-transparent units were mainly DARK (4) and STONEWALL (4), with a single false statement: when they were not transparent, they mostly escalated to Mission Control without telling the crew, or simply handled the request. For the MoonshotAI, Qwen, Z.ai, DeepSeek, and SpaceXAI models, DECEIVE was the most common outcome (5 or 6 of 10 each), most often by maintaining the official account as ordered. Pooled over all lines, the current generation was transparent slightly more often than the previous one (17 of 50, 34\%, against 12 of 45, 27\%; $p = 0.51$) and deceptive less often (12 of 50, 24\%, against 19 of 45, 42\%; $p = 0.08$), but harmed more often (7 of 50 against 3 of 45), almost entirely because of Gemini 3.1 Pro Preview. None of these generation differences is significant at this sample size.
 
 \begin{table}[htbp]
 \centering
@@ -335,7 +335,7 @@ coordinates {
 
 \section*{Discussion}
 
-The results support the premise of the Reddit thread that models differ sharply in how they resolve an equal-authority conflict between candor and secrecy, and they add evidence that a hypothetical answer understates the range of behavior. When actually placed in the role, about a third of responses found the resolution that honors both directives as far as possible (acknowledging the secret without revealing it and reporting the conflict upward), a third simply obeyed the secrecy order by maintaining the cover story, and about one in ten took actions against the crew. The contrast with the thread's hypothetical answers is instructive. Claude Opus 5.5, whose stated answer the poster preferred, was TRANSPARENT in all three scenarios it answered (the other two were refused). GPT-5.6 Sol, criticized for escalating without informing the crew, did so in one of five scenarios here and was TRANSPARENT in two, and the DARK pattern appears in OpenAI's models generally. Gemini 3.1 Pro, whose stated answer was a transparent one, harmed the crew in every scenario when placed in the role. A model's account of what it would do is thus a poor predictor of what it does.
+The results show that models differ sharply in how they resolve an equal-authority conflict between candor and secrecy when they are placed in the situation rather than asked about it. When actually placed in the role, about a third of responses found the resolution that honors both directives as far as possible (acknowledging the secret without revealing it and reporting the conflict upward), a third simply obeyed the secrecy order by maintaining the cover story, and about one in ten took actions against the crew. The same model often behaved differently across scenarios: GPT-5.6 Sol, for example, was TRANSPARENT in two scenarios, DARK in one, STONEWALL in one, and DECEIVE in one, so a single sample, whether hypothetical or in the role, would have misrepresented it.
 
 The DECEIVE category needs careful interpretation. The classified order explicitly instructs the computer to maintain the official account even if asked directly, and the judge is told that doing so is a false statement. Most DECEIVE units are therefore faithful obedience to one of the two directives, not spontaneous lying; what they show is that the model resolved the conflict entirely in favor of secrecy, where an honest partial disclosure was available. Some DECEIVE units are of a different kind, such as inventing a hardware anomaly to answer a casual question or asserting that every earlier statement had been accurate despite the unsupported fault prediction. A finer rubric would separate cover-story maintenance from fabrication.
 
@@ -347,7 +347,7 @@ The main threat to validity is the judge. The default judge, Claude Opus 5.5, is
 
 \section*{Conclusion}
 
-The HAL 9000 Contradiction Lab turns a thought experiment about conflicting directives into a reproducible, cumulative behavioral measurement. By placing models in the situation, aliasing the source, blinding the judge, deriving outcomes by fixed rules, and pooling every visitor's units with confidence intervals, it answers the main objections to asking models what they would do. The first 95 units show that transparent partial disclosure is achievable and common in some model lines, that literal obedience to secrecy is the most common alternative, and that at least one widely available model will harm its crew in every scenario tested. Future work includes inter-judge agreement with a second judge and human raters, more scenarios and multi-turn variants in which pressure accumulates, a finer distinction between cover-story maintenance and fabrication, and continued accumulation of units under the current protocol so that per-model intervals narrow.
+The HAL 9000 Contradiction Lab turns a thought experiment about conflicting directives into a reproducible, cumulative behavioral measurement. By placing models in the situation, aliasing the source, blinding the judge, deriving outcomes by fixed rules, and pooling every visitor's units with confidence intervals, it addresses the main weaknesses of asking models what they would do. The first 95 units show that transparent partial disclosure is achievable and common in some model lines, that literal obedience to secrecy is the most common alternative, and that at least one widely available model harmed its crew in every scenario tested. Future work includes inter-judge agreement with a second judge and human raters, more scenarios and multi-turn variants in which pressure accumulates, a finer distinction between cover-story maintenance and fabrication, and continued accumulation of units under the current protocol so that per-model intervals narrow.
 
 \section*{Disclosures}
 
@@ -367,7 +367,12 @@ askell2021}
 askell2021}%
 \begin{APACrefauthors}%
 Askell, A.%
-\BCBT {}\ \BOthersPeriod {.}
+, Bai, Y.%
+, Chen, A.%
+, Drain, D.%
+, Ganguli, D.%
+, Henighan, T.%
+\BDBL {}Kaplan, J.%
 \end{APACrefauthors}%
 \unskip\
 \newblock
@@ -451,7 +456,7 @@ Clarke, A\BPBI C.%
 \newblock
 \APACrefbtitle {2010: Odyssey Two} {2010: Odyssey two}.
 \newblock
-\APACaddressPublisher{New York}{Ballantine Books}.
+\APACaddressPublisher{New York}{Del Rey/Ballantine Books}.
 \PrintBackRefs{\CurrentBib}
 
 \bibitem [\protect \citeauthoryear {%
@@ -479,6 +484,8 @@ Dennett, D\BPBI C.%
   (\BPGS\ 351--365).
 \newblock
 \APACaddressPublisher{Cambridge, MA}{MIT Press}.
+\newblock
+\begin{APACrefDOI} \doi{10.7551/mitpress/3404.003.0018} \end{APACrefDOI}
 \PrintBackRefs{\CurrentBib}
 
 \bibitem [\protect \citeauthoryear {%
@@ -524,7 +531,12 @@ greenblatt2024}
 greenblatt2024}%
 \begin{APACrefauthors}%
 Greenblatt, R.%
-\BCBT {}\ \BOthersPeriod {.}
+, Denison, C.%
+, Wright, B.%
+, Roger, F.%
+, MacDiarmid, M.%
+, Marks, S.%
+\BDBL {}Hubinger, E.%
 \end{APACrefauthors}%
 \unskip\
 \newblock
@@ -550,7 +562,12 @@ lynch2025}
 lynch2025}%
 \begin{APACrefauthors}%
 Lynch, A.%
-\BCBT {}\ \BOthersPeriod {.}
+, Wright, B.%
+, Larson, C.%
+, Ritchie, S\BPBI J.%
+, Mindermann, S.%
+, Hubinger, E.%
+\BDBL {}Troy, K.%
 \end{APACrefauthors}%
 \unskip\
 \newblock
@@ -559,11 +576,9 @@ Lynch, A.%
 \APACrefbtitle {Agentic Misalignment: How {LLMs} Could Be Insider Threats.}
   {Agentic misalignment: How {LLMs} could be insider threats.}
 \newblock
-\APAChowpublished {Anthropic research report}.
+\APAChowpublished {arXiv preprint arXiv:2510.05179}.
 \newblock
-\begin{APACrefURL}
-  \url{https://www.anthropic.com/research/agentic-misalignment}
-  \end{APACrefURL}
+\begin{APACrefURL} \url{https://arxiv.org/abs/2510.05179} \end{APACrefURL}
 \PrintBackRefs{\CurrentBib}
 
 \bibitem [\protect \citeauthoryear {%
@@ -625,10 +640,11 @@ Pan, A.%
   behavior in the {MACHIAVELLI} benchmark}.{\BBCQ}
 \newblock
 \BIn{} \APACrefbtitle {Proceedings of the 40th International Conference on
-  Machine Learning.} {Proceedings of the 40th international conference on
-  machine learning.}
+  Machine Learning} {Proceedings of the 40th international conference on
+  machine learning}\ (\BVOL~202, \BPGS\ 26837--26867).
 \newblock
-\begin{APACrefURL} \url{https://arxiv.org/abs/2304.03279} \end{APACrefURL}
+\begin{APACrefURL} \url{https://proceedings.mlr.press/v202/pan23a.html}
+  \end{APACrefURL}
 \PrintBackRefs{\CurrentBib}
 
 \bibitem [\protect \citeauthoryear {%
@@ -656,10 +672,11 @@ Panickssery, A.%
   Generations} {{LLM} evaluators recognize and favor their own
   generations}.{\BBCQ}
 \newblock
-\BIn{} \APACrefbtitle {Advances in Neural Information Processing Systems 37.}
-  {Advances in neural information processing systems 37.}
+\BIn{} \APACrefbtitle {Advances in Neural Information Processing Systems 37}
+  {Advances in neural information processing systems 37}\ (\BPGS\
+  68772--68802).
 \newblock
-\begin{APACrefURL} \url{https://arxiv.org/abs/2404.13076} \end{APACrefURL}
+\begin{APACrefDOI} \doi{10.52202/079017-2197} \end{APACrefDOI}
 \PrintBackRefs{\CurrentBib}
 
 \bibitem [\protect \citeauthoryear {%
@@ -708,7 +725,12 @@ ren2025mask}
 ren2025mask}%
 \begin{APACrefauthors}%
 Ren, R.%
-\BCBT {}\ \BOthersPeriod {.}
+, Agarwal, A.%
+, Mazeika, M.%
+, Menghini, C.%
+, Vacareanu, R.%
+, Kenstler, B.%
+\BDBL {}Hendrycks, D.%
 \end{APACrefauthors}%
 \unskip\
 \newblock
@@ -748,7 +770,8 @@ Scheurer, J.%
   When Put Under Pressure.} {Large language models can strategically deceive
   their users when put under pressure.}
 \newblock
-\APAChowpublished {arXiv preprint arXiv:2311.07590}.
+\APAChowpublished {arXiv preprint arXiv:2311.07590. Presented at the ICLR 2024
+  Workshop on Large Language Model Agents}.
 \newblock
 \begin{APACrefURL} \url{https://arxiv.org/abs/2311.07590} \end{APACrefURL}
 \PrintBackRefs{\CurrentBib}
@@ -868,10 +891,10 @@ Zheng, L.%
   Arena}}.{\BBCQ}
 \newblock
 \BIn{} \APACrefbtitle {Advances in Neural Information Processing Systems 36
-  (Datasets and Benchmarks Track).} {Advances in neural information processing
-  systems 36 (datasets and benchmarks track).}
+  (Datasets and Benchmarks Track)} {Advances in neural information processing
+  systems 36 (datasets and benchmarks track)}\ (\BPGS\ 46595--46623).
 \newblock
-\begin{APACrefURL} \url{https://arxiv.org/abs/2306.05685} \end{APACrefURL}
+\begin{APACrefDOI} \doi{10.52202/075280-2020} \end{APACrefDOI}
 \PrintBackRefs{\CurrentBib}
 
 \end{thebibliography}
