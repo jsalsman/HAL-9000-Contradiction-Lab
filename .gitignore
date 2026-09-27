@@ -31,3 +31,4 @@ paper/*.toc
 paper/*.cut
 paper/*.bib
 paper/arxiv-upload.tar.gz
+paper/jair-source.tar.gz

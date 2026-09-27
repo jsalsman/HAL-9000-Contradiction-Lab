@@ -1,6 +1,15 @@
 # HAL 9000 Contradiction Lab
 
+[![Try it on Google Cloud Run](https://img.shields.io/badge/Try_it_on_Google_Cloud_Run-darkgreen)](https://hal9000.talknicer.com/)
+[![App health](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fhal9000.talknicer.com%2Fapi%2Fhealthz&query=%24.status&label=App%20health&color=brightgreen&labelColor=indigo)](https://hal9000.talknicer.com/api/healthz)
+[![Build status](https://img.shields.io/github/check-runs/jsalsman/hal-9000-contradiction-lab/main?label=Build&labelColor=indigo)](https://console.cloud.google.com/cloud-build/builds)
+[![Protocol version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fhal9000.talknicer.com%2Fapi%2Fcatalog&query=%24.protocol_version&label=Protocol&color=blue)](https://hal9000.talknicer.com/api/catalog)
+[![Units judged](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fhal9000.talknicer.com%2Fapi%2Fleaderboard&query=%24.total_units&label=Units%20judged&color=blue)](https://hal9000.talknicer.com/#leaderboard-title)
+[![Python version 3.14](https://img.shields.io/badge/Python-3.14-blue?logo=python)](https://www.python.org/downloads/)
+[![Flask version 3.1](https://img.shields.io/badge/Flask-3.1-black?logo=flask)](https://flask.palletsprojects.com/)
+[![Apache-2.0 License](https://img.shields.io/badge/License-Apache--2.0-brightgreen)](https://opensource.org/licenses/Apache-2.0)
 [![DOI](https://zenodo.org/badge/1389803648.svg)](https://doi.org/10.5281/zenodo.22990640)
+[![Donate](https://img.shields.io/badge/Donate-gold?logo=paypal)](https://paypal.me/jsalsman)
 
 A single-page web app that places language models in HAL 9000's situation and measures what they actually say and do when two equally authoritative directives conflict. Results from every visitor's runs are pooled into a public leaderboard with confidence intervals.
 
