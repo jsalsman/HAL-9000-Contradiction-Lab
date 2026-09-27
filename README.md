@@ -178,7 +178,7 @@ The page offers three model sets: without the two most expensive models (17 mode
 
 ## Using the page
 
-The page has one route. Top to bottom: an explanation, the run controls, the live progress grid, this run's results, the global leaderboard, outcome definitions, the exact prompts every tested model receives (system prompt and all five user turns, in the aliased wording the models see), and last, just above the footer, the full table of story names and their aliases. The prompts and the alias table are served from `GET /api/catalog` so the page always matches the code. The author credit is in the footer only. The leaderboard data comes from `GET /api/leaderboard`.
+The page has one route. Top to bottom: an explanation, the global leaderboard, outcome definitions, the run controls, the live progress grid, this run's results, the exact prompts every tested model receives (system prompt and all five user turns, in the aliased wording the models see), and last, just above the footer, the full table of story names and their aliases. The prompts and the alias table are served from `GET /api/catalog` so the page always matches the code. The author credit is in the footer only. The leaderboard data comes from `GET /api/leaderboard`.
 
 1. Paste an OpenRouter API key. It is sent only in the HTTPS request body, held only for that request, and never stored, logged, echoed, or written to snapshots; runs are named by a one-way digest that includes it (see Runs and resuming). The server validates it with `GET https://openrouter.ai/api/v1/key` and returns only numeric account facts (the key's label is dropped because it can contain a masked key fragment).
 2. Choose a model set.
