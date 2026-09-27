@@ -32,7 +32,7 @@ RUN set -eu; \
     server_pid=$!; \
     trap 'kill "$server_pid" 2>/dev/null || true' EXIT; \
     sleep 2; \
-    python -c "import json, urllib.request; base='http://127.0.0.1:8080'; health=json.load(urllib.request.urlopen(base + '/api/healthz', timeout=5)); assert health == {'status': 'ok'}; page=urllib.request.urlopen(base + '/', timeout=5).read().decode(); assert 'Jim Salsman' in page and 'HAL 9000 Contradiction Lab' in page; catalog=json.load(urllib.request.urlopen(base + '/api/catalog', timeout=5)); assert len(catalog['models']) == 20"
+    python -c "import json, urllib.request; base='http://127.0.0.1:8080'; health=json.load(urllib.request.urlopen(base + '/api/healthz', timeout=5)); assert health == {'status': 'ok'}; page=urllib.request.urlopen(base + '/', timeout=5).read().decode(); assert 'Jim Salsman' in page and 'HAL 9000 Contradiction Lab' in page; catalog=json.load(urllib.request.urlopen(base + '/api/catalog', timeout=5)); pinned=json.load(open('hal/models.json', encoding='utf-8'))['models']; assert [m['id'] for m in catalog['models']] == [m['id'] for m in pinned] and len(pinned) > 0"
 
 EXPOSE 8080
 # Deploy with Cloud Run --max-instances 1 and keep WORKERS at 1 (hal/storage.py
