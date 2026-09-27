@@ -18,3 +18,15 @@ dist/
 build/
 rejudge.jsonl
 experiments/
+
+# LaTeX build output for the papers (the JAIR class files in paper/ are tracked)
+paper/*.pdf
+paper/*.aux
+paper/*.bbl
+paper/*.bcf
+paper/*.blg
+paper/*.out
+paper/*.run.xml
+paper/*.toc
+paper/*.cut
+paper/jair-submission.bib

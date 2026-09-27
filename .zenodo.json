@@ -1,0 +1,35 @@
+{
+  "title": "HAL 9000 Contradiction Lab: software and protocol hal-1 run records",
+  "upload_type": "software",
+  "description": "<p>A single-page web application that places language models in HAL 9000's situation (two equal-authority directives, one requiring candor and one requiring secrecy) through an aliased system prompt, has a structurally blinded peer judge label what each model says and does in five scenarios, derives outcomes from those labels with fixed rules, and pools every visitor's units into a public leaderboard with Wilson 95% intervals.</p><p>This archive includes the complete source code and, in <code>data/hal-1/</code>, a checksummed copy of every stored run record for protocol hal-1: 95 units from 19 models, including visible responses, returned reasoning text, judge labels, provider, usage, cost, and latency.</p>",
+  "creators": [
+    {
+      "name": "Salsman, Jim",
+      "affiliation": "TalkNicer, Inc.",
+      "orcid": "0000-0002-1715-7990"
+    }
+  ],
+  "license": "apache-2.0",
+  "access_right": "open",
+  "keywords": [
+    "large language models",
+    "honesty",
+    "deception",
+    "conflicting instructions",
+    "AI safety evaluation",
+    "LLM-as-a-judge",
+    "role play"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://hal9000.talknicer.com",
+      "relation": "isDocumentedBy",
+      "resource_type": "other"
+    },
+    {
+      "identifier": "https://storage.googleapis.com/hal-9000-tests/",
+      "relation": "isDerivedFrom",
+      "resource_type": "dataset"
+    }
+  ]
+}
