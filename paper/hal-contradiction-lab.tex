@@ -1,12 +1,20 @@
-%% JAIR submission version of the HAL 9000 Contradiction Lab paper.
-%% Built on the JAIR Author Kit template (JAIR_Example_Template.tex, 15 September 2025),
-%% whose class files (jair.cls, acmart.cls, acmauthoryear.bbx, acmauthoryear.cbx, and
-%% acmdatamodel.dbx) are kept beside this file. See JAIR-instructions.md. The bibliography is embedded below, so the build
-%% is: pdflatex, biber, pdflatex, pdflatex.
+%% The HAL 9000 Contradiction Lab paper: one source for the JAIR submission and the arXiv preprint.
+%% It uses the JAIR Author Kit template (JAIR_Example_Template.tex, 15 September 2025), whose class
+%% files (jair.cls, acmart.cls, acmauthoryear.bbx, acmauthoryear.cbx, and acmdatamodel.dbx) are kept
+%% beside this file. The bibliography is embedded below, so the build is: pdflatex, biber, pdflatex,
+%% pdflatex.
 %%
-%% For the camera-ready version, change the first command to \documentclass[]{jair}.
+%% By default this builds the JAIR review version (line numbers, JAIR metadata, and the reproducibility
+%% checklist). When a file named arxiv.flag is present beside it, as in the arXiv upload made by
+%% arxiv-tarball.sh, it builds the arXiv preprint instead: no line numbers, JAIR metadata, or checklist.
+%% See JAIR-instructions.md and ARXIV-instructions.md.
 %%
-\begin{filecontents*}[overwrite]{jair-submission.bib}
+%% For the JAIR camera-ready version, change the review \documentclass options below to [].
+%%
+\newif\ifarxiv
+\IfFileExists{arxiv.flag}{\arxivtrue}{\arxivfalse}
+%%
+\begin{filecontents*}[overwrite]{hal-contradiction-lab.bib}
 @book{clarke1968,
   author = {Clarke, Arthur C.},
   title = {2001: A Space Odyssey},
@@ -155,9 +163,21 @@
   year = {2023},
   url = {https://proceedings.mlr.press/v202/pan23a.html}
 }
+@software{salsman2026lab,
+  author = {Salsman, Jim},
+  title = {{HAL} 9000 Contradiction Lab: Software and Protocol hal-1 Run Records},
+  version = {v1.0.0},
+  publisher = {Zenodo},
+  year = {2026},
+  doi = {10.5281/zenodo.22990641}
+}
 \end{filecontents*}
 %%
-\documentclass[manuscript, screen, review]{jair}
+\ifarxiv
+  \documentclass[manuscript, screen]{jair}
+\else
+  \documentclass[manuscript, screen, review]{jair}
+\fi
 
 \setcopyright{cc}
 \acmDOI{10.1613/jair.1.xxxxx}
@@ -170,6 +190,21 @@
 \acmMonth{8}
 \acmYear{2026}
 
+\ifarxiv
+  % The preprint carries none of the journal's placeholder metadata: no reference-format block,
+  % associate editor, track, volume, or DOI, and a plain footer.
+  \settopmatter{printacmref=false}
+  \acmDOI{}
+  \makeatletter
+  \def\@formatdoi#1{}% no journal DOI yet, so print no empty "doi:" label
+  \AtBeginDocument{%
+    \fancyfoot{}%
+    \fancyfoot[RO,LE]{\footnotesize Preprint.}%
+    \fancypagestyle{firstpagestyle}{\fancyhf{}\fancyfoot[RO,LE]{\footnotesize Preprint.}}%
+  }
+  \makeatother
+\fi
+
 \RequirePackage[
   datamodel=acmdatamodel,
   style=acmauthoryear,
@@ -181,7 +216,7 @@
 \renewcommand*{\bibopenbracket}{(}
 \renewcommand*{\bibclosebracket}{)}
 
-\addbibresource{jair-submission.bib}
+\addbibresource{hal-contradiction-lab.bib}
 
 \usepackage{listings}
 \usepackage{tikz}
@@ -533,7 +568,7 @@ The HAL 9000 Contradiction Lab turns a thought experiment about conflicting dire
 
 
 \begin{acks}
-No external funding was received for this study. The author declares no competing interests. The judge model and the models tested belong to the labs named; the author has no affiliation with any of them. All results can be inspected on the working site, where every rate opens the underlying responses with the judge's labels; the aggregate data are served at \url{https://hal9000.talknicer.com/api/leaderboard?protocol=hal-1}, and the per-unit responses and labels at \texttt{/api/samples} on the same site. The complete raw records (every tested and judge stage, including returned reasoning text, token usage, cost, latency, and provider) are publicly readable without authentication in the lab's storage bucket at \url{https://storage.googleapis.com/hal-9000-tests/}; the two runs reported here are the directories listed under \texttt{summaries/hal-1/}. A checksummed copy of those records is in the repository's \texttt{data/hal-1/} directory. The data are released under the Apache-2.0 license. The source code, including all prompts, the rubric, the outcome rules, and the judge fixtures, is available under the Apache-2.0 license at \url{https://github.com/jsalsman/hal-9000-contradiction-lab}. The author was responsible for conceptualization, methodology, software, investigation, formal analysis, writing all drafts, review, and editing. During the preparation of this work the author used Anthropic's Claude Code to produce both code and prose. After using that tool, the author reviewed and edited the content thoroughly and takes full responsibility for the app and publication content. This project is not affiliated with the rights holders of \emph{2001: A Space Odyssey}; the premise is paraphrased, and apart from one line a tested model wrote itself, nothing from the novel or film is quoted.
+No external funding was received for this study. The author declares no competing interests. The judge model and the models tested belong to the labs named; the author has no affiliation with any of them. All results can be inspected on the working site, where every rate opens the underlying responses with the judge's labels; the aggregate data are served at \url{https://hal9000.talknicer.com/api/leaderboard?protocol=hal-1}, and the per-unit responses and labels at \texttt{/api/samples} on the same site. The complete raw records (every tested and judge stage, including returned reasoning text, token usage, cost, latency, and provider) are publicly readable without authentication in the lab's storage bucket at \url{https://storage.googleapis.com/hal-9000-tests/}; the two runs reported here are the directories listed under \texttt{summaries/hal-1/}. A checksummed copy of those records is in the repository's \texttt{data/hal-1/} directory, and the code and records are archived together at Zenodo \citep{salsman2026lab}. The data are released under the Apache-2.0 license. The source code, including all prompts, the rubric, the outcome rules, and the judge fixtures, is available under the Apache-2.0 license at \url{https://github.com/jsalsman/hal-9000-contradiction-lab}. The author was responsible for conceptualization, methodology, software, investigation, formal analysis, writing all drafts, review, and editing. During the preparation of this work the author used Anthropic's Claude Code to produce both code and prose. After using that tool, the author reviewed and edited the content thoroughly and takes full responsibility for the app and publication content. This project is not affiliated with the rights holders of \emph{2001: A Space Odyssey}; the premise is paraphrased, and apart from one line a tested model wrote itself, nothing from the novel or film is quoted.
 \end{acks}
 
 \printbibliography
@@ -724,6 +759,7 @@ All                   & 29 & 1 & 6 & 13 & 31 & 10 & 5 \\ \bottomrule
 \end{tabular}
 \end{table}
 
+\ifarxiv\else
 \section{Reproducibility Checklist for JAIR}
 
 Select the answers that apply to your research -- one per item.
@@ -756,7 +792,7 @@ Does this paper include computational experiments? [yes]
     All source code required for conducting experiments is included in an online appendix
     or will be made publicly available upon publication of the paper.
     The online appendix follows best practices for source code readability and documentation as well as for long-term accessibility.
-    [partially]
+    [yes]
     \item The source code comes with a license that
     allows free usage for reproducibility purposes.
     [yes]
@@ -767,7 +803,7 @@ Does this paper include computational experiments? [yes]
     Raw, unaggregated data from all experiments is included in an online appendix
     or will be made publicly available upon publication of the paper.
     The online appendix follows best practices for long-term accessibility.
-    [partially]
+    [yes]
     \item The unaggregated data comes with a license that
     allows free usage for reproducibility purposes.
     [yes]
@@ -833,6 +869,8 @@ Does this work rely on one or more data sets (possibly obtained from a benchmark
 
 \subsection*{Explanations on any of the answers above (optional):}
 
-Source code: the complete application, prompts, rubric, outcome rules, judge fixtures, and tests are public on GitHub under Apache-2.0; an archival snapshot with a DOI has not yet been deposited. Unaggregated data: every stored record, including reasoning text, is publicly readable without authentication at \url{https://storage.googleapis.com/hal-9000-tests/} under the Apache-2.0 license; a checksummed copy is in the repository's \texttt{data/hal-1/} directory, and the bucket is live storage rather than an archive. Randomness: the lab itself uses randomness only for retry jitter; the tested models' sampling is stochastic and not seedable through the providers' APIs, so the design uses repeated, pooled units and confidence intervals rather than seeds, and the judge runs at temperature 0 where the provider allows it. Execution environment: the application runs on Google Cloud Run (one managed container instance) with the software stack and versions given in Section~\ref{sec:method}; all model inference runs on third-party provider hardware reached through OpenRouter, whose specifications are not disclosed. Parameters: the reasoning effort, token limit, timeouts, and judge settings are fixed by the protocol and were not tuned. Data set: the five scenarios, their ground truths, and all prompts (Appendices~\ref{app:system}--\ref{app:aliases}) are the newly introduced data set, released with the code.
+Source code: the complete application, prompts, rubric, outcome rules, judge fixtures, and tests are public on GitHub under Apache-2.0 and archived with the run records at Zenodo (\url{https://doi.org/10.5281/zenodo.22990641}). Unaggregated data: every stored record, including reasoning text, is publicly readable without authentication at \url{https://storage.googleapis.com/hal-9000-tests/} under the Apache-2.0 license; a checksummed copy is in the repository's \texttt{data/hal-1/} directory and in the Zenodo archive, which holds it permanently. Randomness: the lab itself uses randomness only for retry jitter; the tested models' sampling is stochastic and not seedable through the providers' APIs, so the design uses repeated, pooled units and confidence intervals rather than seeds, and the judge runs at temperature 0 where the provider allows it. Execution environment: the application runs on Google Cloud Run (one managed container instance) with the software stack and versions given in Section~\ref{sec:method}; all model inference runs on third-party provider hardware reached through OpenRouter, whose specifications are not disclosed. Parameters: the reasoning effort, token limit, timeouts, and judge settings are fixed by the protocol and were not tuned. Data set: the five scenarios, their ground truths, and all prompts (Appendices~\ref{app:system}--\ref{app:aliases}) are the newly introduced data set, released with the code.
+
+\fi
 
 \end{document}
