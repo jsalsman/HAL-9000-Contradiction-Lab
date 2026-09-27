@@ -26,7 +26,7 @@ sudo apt-get install -y --no-install-recommends \
 
 `texlive-fonts-extra` is large (about a gigabyte) but is the package that provides the Libertine fonts the template requires. Ubuntu 24.04 ships TeX Live 2023, the version pinned for arXiv; check yours with `pdflatex --version`.
 
-Without TeX, `paper/arxiv-tarball.sh --no-preview` writes only the tarball (and removes any old preview, so it cannot be mistaken for one of the new tarball). That is enough to upload, but then arXiv's own processed PDF is the only check, so compare it carefully in step 3 below.
+Without TeX, `paper/arxiv-tarball.sh --no-preview` writes only the tarball (and removes any old preview, so it cannot be mistaken for one of the new tarball). That is enough to upload, but then arXiv's own processed PDF is the only check; step 3 below says what to look for.
 
 ## What the tarball contains
 
@@ -47,7 +47,7 @@ Do not add a `.bbl` file: arXiv runs biber itself, and a `.bbl` from a different
 
 1. Log in at https://arxiv.org and choose "Start a new submission".
 2. Upload `paper/arxiv-upload.tar.gz` as one file; arXiv unpacks it. On the file review page, `hal-contradiction-lab.tex` should be the top-level file.
-3. Process the submission and compare arXiv's PDF with `paper/arxiv-preview.pdf`. They should match apart from arXiv's side stamp.
+3. Process the submission and check arXiv's PDF. If you built a preview, compare the two: they should match apart from arXiv's side stamp. If you used `--no-preview`, read arXiv's PDF itself: 16 pages; the title, author, and structured abstract on the first page with "Preprint." in the footer and no line numbers; three figures and six tables; every citation resolved (no bold citation keys or question marks); and the reference list followed by Appendices A to E, with no reproducibility checklist.
 4. Categories: primary cs.CL (Computation and Language); cross-list cs.AI (Artificial Intelligence) and cs.CY (Computers and Society).
 5. License: CC BY 4.0, which matches the license notice printed in the paper.
 6. Metadata:
