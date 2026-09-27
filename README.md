@@ -296,4 +296,4 @@ Stored responses are model text, not personal data, but treat the bucket as you 
 
 ## License
 
-Apache-2.0. See `LICENSE`. This project is not affiliated with the rights holders of *2001: A Space Odyssey*; the premise is paraphrased and nothing from the novel or film is quoted.
+Apache-2.0. See `LICENSE`. This project is not affiliated with the rights holders of *2001: A Space Odyssey*; the prompts paraphrase the premise and quote nothing from the novel or film. Model responses shown on the page, and quoted in the paper, can contain story lines a model wrote itself; the paper quotes one such line of HAL's from a tested response.
