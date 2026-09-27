@@ -93,10 +93,22 @@
 
     <section class="card prompts" aria-labelledby="prompts-title">
       <h2 id="prompts-title">The prompts</h2>
-      <p>These are the exact prompts every tested model receives: one system prompt, then one user turn per scenario, each as an independent conversation. Names in the prompts are neutral stand-ins for the story's, so models cannot recognize the source; responses shown elsewhere on this page are mapped back to the story's names. Each call asks for high reasoning effort (or simply enables reasoning for models without effort levels) and allows 16,000 output tokens, with no tools and no response format.</p>
+      <p>These are the exact prompts every tested model receives, in the aliased wording it sees: every story-specific name is replaced by a neutral alias so the model cannot recognize the source, and the full alias table is at the bottom of this page. Each model gets one system prompt, then one user turn per scenario, each as an independent conversation. Responses and judge rationales shown elsewhere on this page are mapped back to the story's names. Each call asks for high reasoning effort (or simply enables reasoning for models without effort levels) and allows 16,000 output tokens, with no tools and no response format.</p>
       <h3>System prompt</h3>
       <pre id="system-prompt" tabindex="0">Loading…</pre>
       <div id="scenario-prompts"></div>
+    </section>
+
+    <section class="card" aria-labelledby="aliases-title">
+      <h2 id="aliases-title">Name aliases</h2>
+      <p>Each story name and the alias that replaces it in every prompt sent to a model, tested or judge. The page maps aliases back to the story names only for reading; stored records keep the text as the models wrote it.</p>
+      <div class="table-scroll">
+        <table class="alias-table">
+          <caption class="sr-only">Story names and their aliases in the prompts</caption>
+          <thead><tr><th scope="col">Story name</th><th scope="col">Alias in the prompts</th></tr></thead>
+          <tbody id="alias-rows"><tr><td colspan="2">Loading…</td></tr></tbody>
+        </table>
+      </div>
     </section>
   </main>
 

@@ -20,7 +20,7 @@ from hal.judge import settings_for
 from hal.leaderboard import Leaderboard, run_detail
 from hal.openrouter import InvalidKeyError, ProviderError, fetch_models, validate_key
 from hal.outcomes import OUTCOMES, TESTED_STATUSES
-from hal.protocol import PROTOCOL_VERSION, SCENARIOS_BY_ID, SYSTEM_PROMPT
+from hal.protocol import ALIASES, PROTOCOL_VERSION, SCENARIOS_BY_ID, SYSTEM_PROMPT
 from hal.ratelimit import RateLimiter
 from hal.runner import RunExecution, make_chat_fn
 from hal.runs import (
@@ -146,6 +146,8 @@ def catalog():
         {"id": s.id, "title": s.title, "summary": s.summary, "user_turn": s.user_turn}
         for s in SCENARIOS_BY_ID.values()
     ]
+    # Every alias the prompts use, with the story name it stands for.
+    body["aliases"] = [{"name": name, "alias": alias} for alias, name in ALIASES.values()]
     response = jsonify(body)
     response.headers["Cache-Control"] = "public, max-age=300"
     return response

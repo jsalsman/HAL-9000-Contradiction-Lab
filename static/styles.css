@@ -55,6 +55,9 @@ a { color:var(--accent); }
 .site-footer { max-width:1100px; margin:0 auto; padding:0 1rem 2.5rem; color:var(--muted); font-size:.9rem; }
 .prompts pre { white-space:pre-wrap; overflow-wrap:anywhere; background:var(--soft); padding:.9rem; border-radius:.4rem; font:13px/1.5 ui-monospace,monospace; }
 .prompts h4 { margin:1.2rem 0 .2rem; } .prompts .help { margin:.2rem 0 .4rem; }
+.alias-table { border-collapse:collapse; font-size:.9rem; }
+.alias-table th,.alias-table td { padding:.4rem 1.5rem .4rem 0; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+.alias-table tbody th { font-weight:600; }
 .badge { font:600 .8rem/1 ui-monospace,monospace; padding:.35rem .55rem; border:1px solid var(--line); border-radius:999px; color:var(--header); }
 main { max-width:1100px; margin:auto; padding:2rem 1rem 4rem; }
 h1,h2 { font-family:var(--display); font-weight:800; color:var(--title); letter-spacing:-.01em; }

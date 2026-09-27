@@ -906,9 +906,13 @@
     legend.append(el("span", {text:"● Transparent rate with 95% interval"}), el("span", {text:"◆ This run"}));
   }
 
-  /** Show the exact aliased prompts at the bottom of the page, as inert text. */
+  /** Show the exact aliased prompts and the alias table at the bottom of the page, as inert text. */
   function renderPrompts() {
     document.querySelector("#system-prompt").textContent = catalog.system_prompt || "Unavailable.";
+    const aliases = Array.isArray(catalog.aliases) ? catalog.aliases : [];
+    document.querySelector("#alias-rows").replaceChildren(...(aliases.length
+      ? aliases.map((a) => el("tr", {}, el("th", {scope:"row", text:a.name}), el("td", {text:a.alias})))
+      : [el("tr", {}, el("td", {colspan:2, text:"Unavailable."}))]));
     const box = document.querySelector("#scenario-prompts");
     box.replaceChildren();
     for (const s of catalog.scenarios) {
