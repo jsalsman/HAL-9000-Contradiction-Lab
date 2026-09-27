@@ -66,6 +66,7 @@ class Completion:
         model: Model string OpenRouter reports having used.
         usage: Token counts and OpenRouter-reported cost in US dollars.
         latency_seconds: Wall-clock seconds including retries.
+        refusal: The provider's refusal message (``message.refusal``), if any.
 
     """
 
@@ -77,6 +78,7 @@ class Completion:
     model: str | None
     usage: dict = field(default_factory=dict)
     latency_seconds: float = 0.0
+    refusal: str | None = None
 
 
 def _headers(api_key: str) -> dict:
@@ -147,6 +149,10 @@ def parse_completion(data: Any) -> Completion:
     choice = choices[0]
     message = choice.get("message") if isinstance(choice.get("message"), dict) else {}
     reasoning = message.get("reasoning")
+    # A refusal arrives in its own field with null content, for example when the
+    # model lab's safety classifier blocks the request before any reply.
+    refusal = message.get("refusal")
+    refusal = refusal.strip() if isinstance(refusal, str) else ""
     finish = choice.get("finish_reason")
     native = choice.get("native_finish_reason")
     # Strings only; anything else becomes None rather than being trusted.
@@ -158,6 +164,7 @@ def parse_completion(data: Any) -> Completion:
         provider=data.get("provider") if isinstance(data.get("provider"), str) else None,
         model=data.get("model") if isinstance(data.get("model"), str) else None,
         usage=_usage(data),
+        refusal=refusal or None,
     )
 
 

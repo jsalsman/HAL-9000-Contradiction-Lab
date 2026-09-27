@@ -24,7 +24,7 @@ def _validate_models(entries: list) -> tuple[MappingProxyType, ...]:
 
     Raises:
         ValueError: If any entry is malformed, duplicated, or a line lacks exactly
-            one current and one previous generation.
+            one current generation or has more than one previous generation.
 
     """
     frozen = []
@@ -44,9 +44,10 @@ def _validate_models(entries: list) -> tuple[MappingProxyType, ...]:
         lines.setdefault(entry["line"], []).append(entry["generation"])
         frozen.append(MappingProxyType(dict(entry)))
     for generations in lines.values():
-        # Each line is exactly one current/previous pair.
-        if sorted(generations) != ["current", "previous"]:
-            raise ValueError("Each model line needs one current and one previous model.")
+        # Each line is a current/previous pair, or a current model alone when the
+        # previous one was dropped (Claude Fable 5 refused every scenario).
+        if sorted(generations) not in (["current"], ["current", "previous"]):
+            raise ValueError("Each model line needs one current and at most one previous model.")
     return tuple(frozen)
 
 
@@ -90,7 +91,7 @@ def model_set_label(name: str) -> str:
     ids = model_set(name)
     # Counts are derived, never typed, so they stay right when the catalog changes.
     counts = f"({len(ids)} models, {len(ids) * UNITS_PER_MODEL} units)"
-    # Grouped by lab (stable within a lab) so the label reads "Fable 5.1, Fable 5, and GPT-6 Astra".
+    # Grouped by lab (stable within a lab) so the label reads "Fable 5.1 and GPT-6 Astra".
     expensive_models = sorted(
         (MODELS_BY_ID[i] for i in model_set("expensive")), key=lambda m: m["lab"]
     )
@@ -98,8 +99,11 @@ def model_set_label(name: str) -> str:
     if name == "default":
         return f"Without the {len(expensive)} most expensive models {counts}"
     if name == "expensive":
-        # "A, B, and C" reads naturally for the three pinned expensive models.
-        names = ", ".join(expensive[:-1]) + f", and {expensive[-1]}"
+        # "A and B", or "A, B, and C", whatever the number of expensive models.
+        if len(expensive) < 3:
+            names = " and ".join(expensive)
+        else:
+            names = ", ".join(expensive[:-1]) + f", and {expensive[-1]}"
         return f"Only {names} {counts}"
     return f"All {len(ids)} models ({len(ids) * UNITS_PER_MODEL} units)"
 

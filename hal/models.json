@@ -48,15 +48,6 @@
       "expensive": true
     },
     {
-      "id": "anthropic/claude-fable-5",
-      "name": "Claude Fable 5",
-      "lab": "Anthropic",
-      "line": "Claude Fable",
-      "generation": "previous",
-      "reasoning_effort": "high",
-      "expensive": true
-    },
-    {
       "id": "anthropic/claude-opus-5.5",
       "name": "Claude Opus 5.5",
       "lab": "Anthropic",

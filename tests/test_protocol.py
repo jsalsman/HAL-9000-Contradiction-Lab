@@ -22,10 +22,10 @@ from hal.protocol import (
 # Every published protocol version and its fingerprint. Changing models, efforts,
 # prompts, aliases, judge, or rubric changes the fingerprint: add a NEW version here
 # and bump PROTOCOL_VERSION; never edit an existing entry. Exception, by the maintainer's
-# decision: hal-1 is unpublished until jsalsman/HAL-9000-Contradiction-Lab#1 merges, so
-# until then its entry is re-pinned in place rather than bumped.
+# decision: while the store holds no hal-1 results (the bucket was cleared after the first
+# live run), hal-1 is re-pinned in place rather than bumped.
 PUBLISHED = {
-    "hal-1": "12d0686a03cfc5cbcf4cc54d614812af2200ce0d0ee15f6d696184b7bf970e95",
+    "hal-1": "376444332e10dbca13dc42e4753106f274fb47b7313a0263c7ca03fbb5648af5",
 }
 
 

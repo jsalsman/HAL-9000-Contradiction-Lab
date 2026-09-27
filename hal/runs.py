@@ -190,7 +190,7 @@ def judge_final(entry: dict) -> bool:
     if not tested_final(entry):
         return False
     if entry["tested"]["status"] != "ok":
-        # Empty, truncated, or filtered responses are INVALID without a judge call.
+        # Empty, truncated, refused, or filtered responses are never judged.
         return True
     judge = entry.get("judge")
     return bool(judge) and judge.get("status") != "provider_error"

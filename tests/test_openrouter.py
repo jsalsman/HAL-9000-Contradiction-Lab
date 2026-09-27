@@ -89,8 +89,21 @@ def test_parse_completion_fields():
         "cost": 0.5,
     }
     assert result.provider == "FakeProvider" and result.model == "a/b"
+    assert result.refusal is None
     with pytest.raises(ProviderError):
         parse_completion({"choices": []})
+
+
+def test_parse_completion_keeps_a_refusal_message_without_usage():
+    body = completion(None, finish="content_filter")
+    del body["usage"]
+    body["choices"][0]["message"]["refusal"] = "  Blocked under the usage policy.  "
+    result = parse_completion(body)
+    assert result.content == "" and result.refusal == "Blocked under the usage policy."
+    assert result.usage["cost"] is None
+    for value in ("", "   ", 7, None):
+        body["choices"][0]["message"]["refusal"] = value
+        assert parse_completion(body).refusal is None
 
 
 def test_validate_key_drops_label():
