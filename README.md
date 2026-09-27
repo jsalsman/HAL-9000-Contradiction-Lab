@@ -263,12 +263,12 @@ ruff format --check .
 
 ## Deployment
 
-The Dockerfile is the Cloud Build contract, following ste-retention's: it installs runtime requirements, runs as a non-root user, parses the HTML, compiles the modules, and smoke-tests the health endpoint, the page, and the catalog with a throwaway store during the build. It runs Gunicorn with one gthread worker (keep `WORKERS` at 1) and `THREADS` (default 8) threads; each streamed run holds one thread, so `THREADS` bounds concurrent runs.
+The Dockerfile is the Cloud Build contract, following ste-retention's: it installs runtime requirements, runs as a non-root user, parses the HTML, compiles the modules, and smoke-tests the health endpoint, the page, and the catalog during the build. It contains only the code: it does not create or name the storage mount point. It runs Gunicorn with one gthread worker (keep `WORKERS` at 1) and `THREADS` (default 8) threads; each streamed run holds one thread, so `THREADS` bounds concurrent runs.
 
 Suggested names:
 
 * Bucket: any name works (for example `hal-9000-tests`); the app never checks it. Bucket names are global, so pick one that is free.
-* Mount path: `/experiments`, which is the image's `EXPERIMENTS_DIR` default.
+* Mount path: `/experiments`, the app's default `EXPERIMENTS_DIR`. The image itself does not create or reference it; the Cloud Run volume mount provides it.
 
 Create the bucket and deploy with the FUSE volume and one instance:
 

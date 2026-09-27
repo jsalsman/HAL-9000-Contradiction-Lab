@@ -191,3 +191,14 @@ def test_mounted_writable_store_passes_on_cloud_run(store, monkeypatch):
 def test_readback_mismatch_is_reported(store, monkeypatch):
     monkeypatch.setattr(store, "read", lambda name: (b"other", "1"))
     assert "did not return what was written" in storage_problem(store)
+
+
+def test_uncreatable_root_starts_but_is_reported(tmp_path):
+    from hal.storage import LocalStore
+
+    blocker = tmp_path / "file"
+    blocker.write_text("not a directory")
+    store = LocalStore(blocker / "experiments")  # cannot be created; must not raise
+    assert store.list("summaries/") == []
+    assert store.read("runs/x/run.json") is None
+    assert "not writable" in storage_problem(store)

@@ -116,9 +116,17 @@ class LocalStore:
     """
 
     def __init__(self, root: Path) -> None:
-        """Bind the store to a root directory, creating it if needed."""
+        """Bind the store to a root directory, creating it if possible.
+
+        A root that cannot be created (for example an unmounted, unowned
+        /experiments) does not stop the app from starting: the page still serves,
+        and ``storage_problem`` reports the store as unwritable, refusing runs.
+        """
         self.root = Path(root)
-        self.root.mkdir(parents=True, exist_ok=True)
+        try:
+            self.root.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
         # The lock lives on local disk, not under the root: a Cloud Storage FUSE
         # mount does not provide reliable flock, but one instance's /tmp does.
         digest = hashlib.sha256(str(self.root.resolve()).encode()).hexdigest()[:16]
@@ -146,7 +154,8 @@ class LocalStore:
         """Return a version token that changes on every atomic replace."""
         try:
             stat = path.stat()
-        except FileNotFoundError:
+        except (FileNotFoundError, NotADirectoryError):
+            # A missing root (or a file where a directory should be) means absent.
             return None
         # A replace creates a new inode, and mtime_ns changes with it.
         return f"{stat.st_ino}-{stat.st_mtime_ns}-{stat.st_size}"
