@@ -207,7 +207,7 @@ The page uses a single dark theme inspired by the original release poster: a dee
 
 The leaderboard is public and cumulative.
 
-**Deployment contract: the Cloud Run service runs with `--max-instances 1` and one Gunicorn worker, with the bucket mounted by Cloud Storage FUSE at `/experiments`.** The bucket is required: Cloud Run's container filesystem is in memory and is lost whenever the instance stops, so runs, checkpoints, the leaderboard, and flags persist only in the bucket. On Cloud Run (detected by `K_SERVICE`), if `/experiments` is not a Cloud Storage FUSE mount and the API backend is not configured, the app logs an error and refuses to start runs or record flags (HTTP 503) rather than take payment for work that would vanish. One process is therefore the only reader and writer of the store. Every read, write, listing, and delete goes through one in-process lock plus a local `flock`, so the FUSE mount's non-atomic renames and eventually consistent listings cannot race with another writer, and there is no mixed FUSE and Cloud Storage API access. The same process holds the only leaderboard cache and the only rate-limit state. Raising max-instances requires switching to the Cloud Storage API backend described below first.
+**Deployment contract: the Cloud Run service runs with `--max-instances 1` and one Gunicorn worker, with the bucket mounted by Cloud Storage FUSE at `/experiments`.** The bucket is required: Cloud Run's container filesystem is in memory and is lost whenever the instance stops, so runs, checkpoints, the leaderboard, and flags persist only in the bucket. At startup the app checks the store in two ways. On Cloud Run (detected by `K_SERVICE`), `/experiments` must be a Cloud Storage FUSE mount of some bucket; the name does not matter. A write test alone would not do, because the image's own `/experiments` directory is on in-memory disk and is writable. Then, everywhere, it writes, reads back, and deletes a small probe object, which catches a read-only mount or a runtime identity without write access to the bucket. If either check fails, the app logs an error and refuses to start runs or record flags (HTTP 503) rather than take payment for work that would vanish. One process is therefore the only reader and writer of the store. Every read, write, listing, and delete goes through one in-process lock plus a local `flock`, so the FUSE mount's non-atomic renames and eventually consistent listings cannot race with another writer, and there is no mixed FUSE and Cloud Storage API access. The same process holds the only leaderboard cache and the only rate-limit state. Raising max-instances requires switching to the Cloud Storage API backend described below first.
 
 The layout also keeps concurrent users apart within that one process:
 
@@ -263,12 +263,12 @@ ruff format --check .
 
 ## Deployment
 
-The Dockerfile is the Cloud Build contract, following ste-retention's: it installs runtime requirements, runs as a non-root user, parses the HTML, compiles the modules, and smoke-tests the health endpoint, the page, and the catalog with a throwaway store during the build. It runs Gunicorn with one gthread worker (keep `WORKERS` at 1) and `THREADS` (default 8) threads; each streamed run holds one thread, so `THREADS` bounds concurrent runs.
+The Dockerfile is the Cloud Build contract, following ste-retention's: it installs runtime requirements, runs as a non-root user, parses the HTML, compiles the modules, and smoke-tests the health endpoint, the page, and the catalog during the build. It contains only the code: it does not create or name the storage mount point. It runs Gunicorn with one gthread worker (keep `WORKERS` at 1) and `THREADS` (default 8) threads; each streamed run holds one thread, so `THREADS` bounds concurrent runs.
 
 Suggested names:
 
-* Bucket: `hal-9000-contradiction-lab` (bucket names are global, so add your project ID as a suffix if that one is taken).
-* Mount path: `/experiments`, which is the image's `EXPERIMENTS_DIR` default.
+* Bucket: any name works (for example `hal-9000-tests`); the app never checks it. Bucket names are global, so pick one that is free.
+* Mount path: `/experiments`, the app's default `EXPERIMENTS_DIR`. The image itself does not create or reference it; the Cloud Run volume mount provides it.
 
 Create the bucket and deploy with the FUSE volume and one instance:
 
