@@ -59,20 +59,24 @@ def unit_costs(pricing: dict, model_id: str, judge_id: str = JUDGE["id"]) -> dic
     return {"tested": tested, "judge": judge}
 
 
-# Provider stops that report no usage and are not billed.
-UNBILLED_STATUSES = ("refused", "filtered")
+# Provider stops known to report no usage and bill nothing: a refusal message
+# sent in place of a reply. A filter stop without one is not known to be unbilled.
+UNBILLED_STATUSES = ("refused",)
 
 
 def observed_costs(units: list[dict]) -> dict[str, dict]:
     """Return each model's mean observed cost per final unit, tests and judging combined.
 
-    A refused or filtered unit with no reported cost was stopped by the provider,
-    which reports no usage and bills nothing, so it counts as zero. Any other unit
-    with an unknown charge (for example a timeout, which may have been billed) is
-    left out, so it neither lowers the mean nor makes a model look free.
+    A refused unit with no reported cost was declined by the provider, which bills
+    nothing for it, so it counts as zero. A unit with a timed-out stage is left out
+    even when part of its cost is known, because the stage that ran to its deadline
+    may have been billed without reporting a cost; so is any other unit with an
+    unknown charge. Neither lowers the mean or makes a model look free.
     """
     by_model: dict[str, list[float]] = defaultdict(list)
     for unit in units:
+        if "timeout" in (unit.get("tested_status"), unit.get("judge_status")):
+            continue
         cost = unit.get("cost_usd")
         if isinstance(cost, (int, float)) and not isinstance(cost, bool) and cost >= 0:
             by_model[unit["model_id"]].append(cost)

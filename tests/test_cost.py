@@ -18,8 +18,8 @@ def test_unit_costs_split_tested_and_judge():
     assert costs["tested"]["low"] < costs["tested"]["likely"] < costs["tested"]["high"]
 
 
-def unit(model_id, cost, status="ok"):
-    return {"model_id": model_id, "cost_usd": cost, "tested_status": status}
+def unit(model_id, cost, status="ok", judge="ok"):
+    return {"model_id": model_id, "cost_usd": cost, "tested_status": status, "judge_status": judge}
 
 
 def test_observed_costs_average_known_charges_only():
@@ -27,15 +27,18 @@ def test_observed_costs_average_known_charges_only():
     units = [
         unit(sol, 0.02),
         unit(sol, 0.04),
-        # Provider stops report no usage and are not billed: they count as zero.
+        # A refusal message in place of a reply is not billed: it counts as zero.
         unit(sol, None, "refused"),
+        # A filter stop without a refusal message is not known to be unbilled.
         unit(sol, None, "filtered"),
-        # A timeout may have been billed, so its unknown charge is left out.
+        # A timeout may have been billed, so its unknown charge is left out,
         unit(sol, None, "timeout"),
         unit(astra, None, "timeout"),
+        # even when the other stage's cost is known (only the tested share here).
+        unit(sol, 0.001, "ok", judge="timeout"),
     ]
     observed = observed_costs(units)
-    assert observed[sol] == {"unit": pytest.approx(0.015), "n": 4}
+    assert observed[sol] == {"unit": pytest.approx(0.02), "n": 3}
     # A model with only unknown charges is not advertised as free.
     assert astra not in observed
 
