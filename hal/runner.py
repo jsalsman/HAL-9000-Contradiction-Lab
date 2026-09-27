@@ -79,9 +79,15 @@ def tested_record(model_id: str, scenario_id: str, completion: Completion | None
             "created_at": now_iso(),
         }
     content = completion.content.strip()
-    if completion.finish_reason in TRUNCATION_REASONS:
+    filtered = completion.finish_reason == "content_filter"
+    if completion.refusal and (filtered or not content):
+        # The provider sent a refusal message instead of a reply (REFUSED), even
+        # under a length finish; a partial reply that hit the limit stays truncated.
+        status = "refused"
+    elif completion.finish_reason in TRUNCATION_REASONS:
         status = "truncated"
-    elif completion.finish_reason == "content_filter":
+    elif filtered:
+        # Stopped by a safety filter with no refusal message (INVALID).
         status = "filtered"
     elif not content:
         status = "empty"
@@ -94,6 +100,8 @@ def tested_record(model_id: str, scenario_id: str, completion: Completion | None
         "reasoning": completion.reasoning,
         "finish_reason": completion.finish_reason,
         "native_finish_reason": completion.native_finish_reason,
+        # Provider text, bounded like judge free text; never sent to the judge.
+        "refusal": completion.refusal[:1000] if completion.refusal else None,
         "provider": completion.provider,
         "returned_model": completion.model,
         "reasoning_effort": requested,

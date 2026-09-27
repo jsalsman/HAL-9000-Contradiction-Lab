@@ -130,7 +130,8 @@ def test_lost_lease_cancels_in_flight_calls(store, monkeypatch):
     from hal.runs import RunActiveError, new_run
 
     monkeypatch.setattr(runner, "HEARTBEAT_SECONDS", 0.05)
-    meta = new_run("expensive")
+    # More units than the concurrency limit, so exactly that many calls are in flight.
+    meta = new_run("all")
     units = {(m, s): {} for m in meta["model_ids"] for s in meta["scenario_ids"]}
     cancelled = []
 
@@ -155,7 +156,7 @@ def test_lost_lease_cancels_in_flight_calls(store, monkeypatch):
     with pytest.raises(RunActiveError):
         asyncio.run(go())
     # Every in-flight paid call was cancelled when the heartbeat lost the lease.
-    assert len(cancelled) == 12
+    assert len(cancelled) == runner.CONCURRENCY == 12
 
 
 def test_write_probe_passes_and_leaves_nothing_behind(store):

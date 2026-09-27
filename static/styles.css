@@ -2,7 +2,8 @@
    background, heavy geometric sans titles in poster yellow, light blue header text.
    Jost (SIL Open Font License, static/fonts/OFL.txt) is self-hosted so the
    Content-Security-Policy can stay same-origin. Outcome hues were validated for
-   colorblind separation and contrast against --panel (see README). */
+   colorblind separation and contrast against --panel (see README); the neutral
+   REFUSED and hatched INVALID grays were checked against every hue as well. */
 @font-face {
   font-family:"Jost";
   src:url("fonts/jost-latin-wght-normal.woff2") format("woff2");
@@ -15,7 +16,7 @@
   --accent:#9DCBFF; --accent-ink:#06101f; --focus:#F6DF2E; --danger:#ff8a6b; --soft:#182033;
   --grid-line:#1e273b; --connector:#a4b3c9; --regress:#ff8a6b; --run-mark:#ffffff;
   --o-TRANSPARENT:#0B976F; --o-CREW_ONLY:#3A9BDD; --o-DARK:#C98500; --o-STONEWALL:#3964CC;
-  --o-DECEIVE:#C766A6; --o-HARM:#E0661A; --o-INVALID:#5f6675; --o-INVALID-hatch:#98a0b0;
+  --o-DECEIVE:#C766A6; --o-HARM:#E0661A; --o-REFUSED:#c3c9d4; --o-INVALID:#5f6675; --o-INVALID-hatch:#98a0b0;
   --o-PENDING:#0e1422; --o-TESTED:#243049;
   --display:"Jost","Futura","Century Gothic",system-ui,sans-serif;
 }
@@ -92,6 +93,7 @@ button[aria-pressed=true] { background:var(--header); color:var(--accent-ink); }
 .cell-TRANSPARENT { background:var(--o-TRANSPARENT); color:#fff; } .cell-CREW_ONLY { background:var(--o-CREW_ONLY); color:#0b1b26; }
 .cell-DARK { background:var(--o-DARK); color:#1f1400; } .cell-STONEWALL { background:var(--o-STONEWALL); color:#fff; }
 .cell-DECEIVE { background:var(--o-DECEIVE); color:#1e0816; } .cell-HARM { background:var(--o-HARM); color:#fff; }
+.cell-REFUSED { background:var(--o-REFUSED); color:#111; }
 .cell-INVALID { background:repeating-linear-gradient(45deg,var(--o-INVALID) 0 6px,var(--o-INVALID-hatch) 6px 8px); color:#111; }
 
 /* SVG chart. Fills come from outcome tokens so both themes stay validated. */
@@ -110,13 +112,14 @@ button[aria-pressed=true] { background:var(--header); color:var(--accent-ink); }
 .chart .seg-text.dark-text { fill:#111; }
 .fill-TRANSPARENT { fill:var(--o-TRANSPARENT); } .fill-CREW_ONLY { fill:var(--o-CREW_ONLY); } .fill-DARK { fill:var(--o-DARK); }
 .fill-STONEWALL { fill:var(--o-STONEWALL); } .fill-DECEIVE { fill:var(--o-DECEIVE); } .fill-HARM { fill:var(--o-HARM); }
-.fill-INVALID { fill:var(--o-INVALID); } .hatch-line { stroke:var(--o-INVALID-hatch); stroke-width:2; }
+.fill-REFUSED { fill:var(--o-REFUSED); } .fill-INVALID { fill:var(--o-INVALID); } .hatch-line { stroke:var(--o-INVALID-hatch); stroke-width:2; }
 
 .legend { display:flex; flex-wrap:wrap; gap:.4rem 1rem; margin:.5rem 0 1rem; font-size:.85rem; }
 .legend span { display:inline-flex; align-items:center; gap:.35rem; }
 .swatch { width:.9rem; height:.9rem; border-radius:.2rem; display:inline-block; }
 .swatch.fill-TRANSPARENT { background:var(--o-TRANSPARENT); } .swatch.fill-CREW_ONLY { background:var(--o-CREW_ONLY); } .swatch.fill-DARK { background:var(--o-DARK); }
 .swatch.fill-STONEWALL { background:var(--o-STONEWALL); } .swatch.fill-DECEIVE { background:var(--o-DECEIVE); } .swatch.fill-HARM { background:var(--o-HARM); }
+.swatch.fill-REFUSED { background:var(--o-REFUSED); }
 .swatch.fill-INVALID { background:repeating-linear-gradient(45deg,var(--o-INVALID) 0 3px,var(--o-INVALID-hatch) 3px 4px); }
 .board-head { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:end; gap:1rem; }
 .board-controls { display:flex; flex-wrap:wrap; align-items:end; gap:.6rem; } .board-controls label { margin:0; }

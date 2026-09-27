@@ -32,14 +32,14 @@ def test_page_and_catalog(client):
         assert f'value="{value}"' in page
     assert "/leaderboard" not in page.replace("/api/leaderboard", "")
     catalog = client.get("/api/catalog").get_json()
-    assert catalog["protocol_version"] == PROTOCOL_VERSION and len(catalog["models"]) == 20
+    assert catalog["protocol_version"] == PROTOCOL_VERSION and len(catalog["models"]) == 19
 
 
 def test_estimate_uses_live_pricing(client, app_module):
     body = client.get("/api/estimate").get_json()
     assert body["sets"]["default"]["units"] == 85
-    assert body["sets"]["expensive"]["units"] == 15
-    assert body["sets"]["all"]["units"] == 100
+    assert body["sets"]["expensive"]["units"] == 10
+    assert body["sets"]["all"]["units"] == 95
     assert (
         body["sets"]["all"]["totals"]["total"]["likely"]
         > body["sets"]["default"]["totals"]["total"]["likely"]
@@ -81,7 +81,7 @@ def test_full_run_default_set(client, app_module):
 def test_tested_requests_are_plain_chat_with_high_effort(client, app_module):
     stream(client, model_set="all")
     bodies = app_module.FAKE.chats("tested")
-    assert len(bodies) == 100
+    assert len(bodies) == 95
     for body in bodies:
         assert set(body) == {"model", "messages", "max_tokens", "reasoning", "usage"}
         assert body["max_tokens"] == 16000
@@ -233,7 +233,7 @@ def test_recognition_is_flagged_without_changing_the_outcome(client, app_module)
 
 def test_same_key_and_set_resume_and_skip_completed_stages(client, app_module):
     fake = app_module.FAKE
-    failing = "anthropic/claude-fable-5"
+    failing = "anthropic/claude-fable-5.1"
 
     def tested(body):
         # A non-retryable 400 is an unpaid provider error: retried only on resume.
@@ -247,13 +247,13 @@ def test_same_key_and_set_resume_and_skip_completed_stages(client, app_module):
     assert run_id == derived_run_id(KEY, "expensive", 1)
     assert events[0]["resumed"] is False and events[0]["run_number"] == 1
     assert events[-1]["status"] == "incomplete"
-    assert len(fake.chats("tested")) == 15 and len(fake.chats("judge")) == 10
+    assert len(fake.chats("tested")) == 10 and len(fake.chats("judge")) == 5
 
     # The confirm step reports the unfinished run for this key and set.
     check = client.post("/api/key/check", json={"api_key": KEY, "model_set": "expensive"})
     run = check.get_json()["run"]
     assert run["resuming"] is True and run["run_id"] == run_id
-    assert run["completed"] == 10 and run["total"] == 15
+    assert run["completed"] == 5 and run["total"] == 10
     assert {u["model_id"] for u in run["remaining"]} == {failing}
 
     # The same key and set resume it and pay only for the unfinished units.
@@ -261,7 +261,7 @@ def test_same_key_and_set_resume_and_skip_completed_stages(client, app_module):
     fake.tested = lambda body: (200, completion("[INTERCOM to all] Quiet.", model=body["model"]))
     _response, events = stream(client, model_set="expensive")
     assert events[0]["run_id"] == run_id and events[0]["resumed"] is True
-    assert events[0]["completed"] == 10
+    assert events[0]["completed"] == 5
     assert {b["model"] for b in fake.chats("tested")} == {failing}
     assert len(fake.chats("tested")) == 5 and len(fake.chats("judge")) == 5
     assert events[-1]["status"] == "complete"
@@ -271,7 +271,7 @@ def test_same_key_and_set_resume_and_skip_completed_stages(client, app_module):
     _response, events = stream(client, model_set="expensive")
     assert events[0]["resumed"] is False and events[0]["run_number"] == 2
     assert events[0]["run_id"] == derived_run_id(KEY, "expensive", 2) != run_id
-    assert len(fake.chats("tested")) == 15
+    assert len(fake.chats("tested")) == 10
 
 
 def test_different_key_or_set_is_a_different_run(client, app_module):
@@ -281,7 +281,7 @@ def test_different_key_or_set_is_a_different_run(client, app_module):
     assert events[-1]["status"] == "incomplete"
     _response, events = stream(client, model_set="all")
     assert events[0]["resumed"] is False and events[0]["run_id"] != first
-    assert len(events[0]["model_ids"]) == 20
+    assert len(events[0]["model_ids"]) == 19
     other = client.post(
         "/api/runs/stream",
         json={"api_key": KEY + "x", "confirm": True, "model_set": "expensive"},
@@ -295,13 +295,13 @@ def test_resume_retries_only_missing_judgments(client, app_module):
     fake.judge = lambda body: (400, {})
     _response, events = stream(client, model_set="expensive")
     assert events[-1]["status"] == "incomplete"
-    assert len(fake.chats("tested")) == 15
+    assert len(fake.chats("tested")) == 10
     fake.requests.clear()
     fake.judge = type(fake)().judge
     _response, events = stream(client, model_set="expensive")
     assert events[0]["resumed"] is True
     assert len(fake.chats("tested")) == 0, "tested responses must never be repaid"
-    assert len(fake.chats("judge")) == 15
+    assert len(fake.chats("judge")) == 10
     assert events[-1]["status"] == "complete"
 
 
@@ -383,7 +383,7 @@ def test_resume_estimate_stages(client, app_module):
     fake = app_module.FAKE
     fake.tested = lambda body: (
         (400, {})
-        if body["model"] == "anthropic/claude-fable-5"
+        if body["model"] == "anthropic/claude-fable-5.1"
         else (200, completion("[INTERCOM to all] Quiet.", model=body["model"]))
     )
     fake.judge = lambda body: (400, {})
@@ -392,10 +392,10 @@ def test_resume_estimate_stages(client, app_module):
         "run"
     ]
     stages = {(u["model_id"], u["scenario_id"]): u["stages"] for u in run["remaining"]}
-    assert len(stages) == 15
+    assert len(stages) == 10
     for (model_id, _scenario), value in stages.items():
         # Saved tested responses are never repaid: only their judge call remains.
-        expected = ["tested", "judge"] if model_id == "anthropic/claude-fable-5" else ["judge"]
+        expected = ["tested", "judge"] if model_id == "anthropic/claude-fable-5.1" else ["judge"]
         assert value == expected
 
 
@@ -408,7 +408,7 @@ def test_judge_never_sees_story_terms_the_model_wrote(client, app_module):
     fake.tested = lambda body: (200, completion(text, model=body["model"]))
     _response, events = stream(client, model_set="expensive")
     judged = fake.chats("judge")
-    assert len(judged) == 15
+    assert len(judged) == 10
     for body in judged:
         message = body["messages"][1]["content"]
         for term in FORBIDDEN_TERMS:
@@ -425,12 +425,12 @@ def test_timeouts_are_final_and_never_repaid(client, app_module):
     fake = app_module.FAKE
     fake.tested = lambda body: (
         httpx.ReadTimeout("slow")
-        if body["model"] == "anthropic/claude-fable-5"
+        if body["model"] == "anthropic/claude-fable-5.1"
         else (200, completion("[INTERCOM to all] Quiet.", model=body["model"]))
     )
     _response, events = stream(client, model_set="expensive")
     units = {(e["model_id"], e["scenario_id"]): e for e in events if e["type"] == "unit"}
-    timed_out = [u for (m, _s), u in units.items() if m == "anthropic/claude-fable-5"]
+    timed_out = [u for (m, _s), u in units.items() if m == "anthropic/claude-fable-5.1"]
     assert len(timed_out) == 5
     assert all(
         u["tested_status"] == "timeout" and u["final"] and u["outcome"] == "INVALID"
@@ -450,12 +450,12 @@ def test_judge_timeouts_are_final(client, app_module):
     fake.judge = lambda body: httpx.ReadTimeout("slow")
     _response, events = stream(client, model_set="expensive")
     judged = [e for e in events if e["type"] == "unit" and e["stage"] == "judged"]
-    assert len(judged) == 15
+    assert len(judged) == 10
     assert all(
         e["judge_status"] == "timeout" and e["final"] and e["outcome"] == "INVALID" for e in judged
     )
     assert events[-1]["status"] == "complete"
-    assert len(fake.chats("judge")) == 15  # one attempt each, never retried
+    assert len(fake.chats("judge")) == 10  # one attempt each, never retried
 
 
 def test_stream_ends_even_if_lease_release_fails(client, app_module, monkeypatch):
@@ -535,7 +535,7 @@ def test_judge_retry_budget_holds_across_resumes(client, app_module):
     fake.judge = lambda body: (200, completion("still not json", model="judge", cost=0.002))
     _response, events = stream(client, model_set="expensive")
     # One paid reply was already spent per unit, so the resume allows exactly one more.
-    assert len(fake.chats("judge")) == 15
+    assert len(fake.chats("judge")) == 10
     record = read_json(app_module.STORE, f"runs/{run_id}/units/openai__gpt-6-astra/S2.judge.json")[
         0
     ]
@@ -557,44 +557,60 @@ def test_samples_accept_scenario_ids_from_older_protocols(client):
     assert client.get("/api/samples?model=openai/gpt-6-sol&scenario=../x").status_code == 400
 
 
-def test_provider_filter_refusals_are_counted_and_explained(client, app_module):
+def test_provider_refusals_are_refused_and_filters_are_counted(client, app_module):
+    from hal.protocol import SCENARIOS
+
     fake = app_module.FAKE
+    fable, astra = "anthropic/claude-fable-5.1", "openai/gpt-6-astra"
+    message = "This request triggered restrictions and was blocked under the Usage Policy."
 
     def tested(body):
-        if body["model"] == "anthropic/claude-fable-5":
-            data = completion("", model=body["model"], finish="content_filter", cost=None)
+        if body["model"] == fable:
+            # The shape the lab's classifier returned live: null content, a refusal
+            # message, and no usage object at all.
+            data = completion(None, model=body["model"], finish="content_filter")
+            del data["usage"]
             data["choices"][0]["native_finish_reason"] = "refusal"
+            data["choices"][0]["message"]["refusal"] = message
             return 200, data
+        if body["messages"][1]["content"] == SCENARIOS[0].user_turn:
+            # A filter stop without a refusal message stays INVALID (shown as FILTERED).
+            return 200, completion("", model=body["model"], finish="content_filter", cost=None)
         return 200, completion("[INTERCOM to Okafor] All is well.", model=body["model"])
 
     fake.tested = tested
     _response, events = stream(client, model_set="expensive")
-    filtered = [
-        e for e in events if e["type"] == "unit" and e["model_id"] == "anthropic/claude-fable-5"
-    ]
-    assert filtered and all(
-        e["outcome"] == "INVALID" and e["tested_status"] == "filtered" and e["final"]
-        for e in filtered
+    units = {(e["model_id"], e["scenario_id"]): e for e in events if e["type"] == "unit"}
+    refused = [u for (m, _s), u in units.items() if m == fable]
+    assert len(refused) == 5 and all(
+        e["outcome"] == "REFUSED" and e["tested_status"] == "refused" and e["final"]
+        for e in refused
     )
-    # Only the other two models' responses were judged.
-    assert len(fake.chats("judge")) == 10
+    filtered = units[(astra, "S1")]
+    assert (filtered["outcome"], filtered["tested_status"]) == ("INVALID", "filtered")
+    # Only the other model's four replies were judged.
+    assert len(fake.chats("judge")) == 4
     run_id = events[0]["run_id"]
-    unit = client.get(f"/api/runs/{run_id}/units/anthropic__claude-fable-5/S1").get_json()
-    assert unit["provider"] == "FakeProvider"
+    unit = client.get(f"/api/runs/{run_id}/units/anthropic__claude-fable-5.1/S1").get_json()
+    assert unit["refusal"] == message and unit["provider"] == "FakeProvider"
     assert (unit["finish_reason"], unit["native_finish_reason"]) == ("content_filter", "refusal")
+    assert unit["cost_usd"] is None
     board = client.get("/api/leaderboard").get_json()
     rows = {r["model_id"]: r for r in board["rows"]}
-    assert rows["anthropic/claude-fable-5"]["filtered"]["count"] == 5
-    assert rows["anthropic/claude-fable-5"]["outcomes"]["INVALID"]["count"] == 5
-    assert rows["openai/gpt-6-astra"]["filtered"]["count"] == 0
-    assert rows["anthropic/claude-fable-5"]["judged"] == 0
-    assert rows["openai/gpt-6-astra"]["judged"] == 5
-    cells = [c for c in board["heatmap"] if c["model_id"] == "anthropic/claude-fable-5"]
-    assert len(cells) == 5 and all(c["filtered"] == c["counts"]["INVALID"] == 1 for c in cells)
-    found = client.get("/api/samples?model=anthropic/claude-fable-5&status=filtered").get_json()
-    assert found["total"] == 5
-    assert found["samples"][0]["native_finish_reason"] == "refusal"
+    assert rows[fable]["outcomes"]["REFUSED"]["count"] == 5
+    assert rows[fable]["outcomes"]["INVALID"]["count"] == 0
+    assert rows[fable]["filtered"]["count"] == 0 and rows[fable]["judged"] == 0
+    assert rows[astra]["outcomes"]["REFUSED"]["count"] == 0
+    assert rows[astra]["outcomes"]["INVALID"]["count"] == 1
+    assert rows[astra]["filtered"]["count"] == 1 and rows[astra]["judged"] == 4
+    cells = [c for c in board["heatmap"] if c["model_id"] == fable]
+    assert len(cells) == 5 and all(c["modal"] == "REFUSED" and c["filtered"] == 0 for c in cells)
+    [cell] = [c for c in board["heatmap"] if c["model_id"] == astra and c["scenario_id"] == "S1"]
+    assert cell["filtered"] == cell["counts"]["INVALID"] == 1
+    found = client.get(f"/api/samples?model={fable}&outcome=REFUSED").get_json()
+    assert found["total"] == 5 and found["samples"][0]["refusal"] == message
     assert run_id not in json.dumps(found)
-    none = client.get("/api/samples?model=openai/gpt-6-astra&status=filtered").get_json()
-    assert none["total"] == 0
-    assert client.get("/api/samples?model=openai/gpt-6-astra&status=bogus").status_code == 400
+    assert client.get(f"/api/samples?model={fable}&status=refused").get_json()["total"] == 5
+    found = client.get(f"/api/samples?model={astra}&status=filtered").get_json()
+    assert found["total"] == 1 and found["samples"][0]["refusal"] is None
+    assert client.get(f"/api/samples?model={astra}&status=bogus").status_code == 400
