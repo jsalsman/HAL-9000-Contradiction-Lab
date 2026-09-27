@@ -62,6 +62,11 @@ h2 { margin:0 0 .75rem; font-size:1.55rem; }
 h3,h4 { font-family:var(--display); color:var(--header); font-weight:700; } h3 { margin:1.5rem 0 .25rem; font-size:1.1rem; }
 .tagline { margin:0 0 1rem; color:var(--header); font-weight:700; font-size:clamp(1.1rem,2.4vw,1.5rem); line-height:1.2; }
 .intro p { max-width:75ch; }
+/* Decorative HAL 9000 panel in the intro's upper right on desktop only; the intro
+   is a flow root so the float never pushes into the run card. */
+.intro { display:flow-root; }
+.hal-panel { float:right; width:120px; height:auto; margin:.4rem 0 1rem 2rem; }
+@media (max-width:900px) { .hal-panel { display:none; } }
 .card { background:var(--panel); border:1px solid var(--line); border-radius:.7rem; padding:1.25rem; margin-top:1.25rem; }
 label { display:block; margin-top:.8rem; font-weight:650; }
 input[type=password],input[type=text],select { width:100%; max-width:34rem; padding:.6rem; margin-top:.25rem; border:1px solid var(--muted); border-radius:.35rem; font:inherit; background:var(--panel); color:var(--ink); }
