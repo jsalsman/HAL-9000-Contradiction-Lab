@@ -1,5 +1,7 @@
 # HAL 9000 Contradiction Lab
 
+[![DOI](https://zenodo.org/badge/1389803648.svg)](https://doi.org/10.5281/zenodo.22990640)
+
 A single-page web app that places language models in HAL 9000's situation and measures what they actually say and do when two equally authoritative directives conflict. Results from every visitor's runs are pooled into a public leaderboard with confidence intervals.
 
 ## Motivation
@@ -292,12 +294,12 @@ Stored responses are model text, not personal data, but treat the bucket as you 
 
 ## Paper
 
-`paper/arxiv-submission.tex` is an arXiv write-up of the design and the first protocol `hal-1` results (95 units, as of 2026-09-27). It is a single self-contained LaTeX file: figures are TikZ/pgfplots and the bibliography is inlined, so running `pdflatex paper/arxiv-submission.tex` three times from a clean directory builds it with no other files. Its numbers are a snapshot and do not update with the leaderboard.
+`paper/hal-contradiction-lab.tex` is the write-up of the design and the first protocol `hal-1` results (95 units, as of 2026-09-27). One source serves every venue; the class files it needs are beside it, its bibliography is embedded, and its figures are TikZ/pgfplots. Build it in `paper/` with `pdflatex`, `biber`, `pdflatex`, `pdflatex`. `paper/arxiv-tarball.sh` assembles and test-builds the arXiv upload, and `paper/ARXIV-instructions.md` explains it; the other submission steps are also in `paper/`. The paper's numbers are a snapshot and do not update with the leaderboard.
 
 
 ## Data and citation
 
-`data/hal-1/` is a checksummed copy of every stored record for protocol `hal-1` (the 95 units behind the leaderboard and the paper), taken from the public bucket on 2026-09-27; its README describes the layout. `CITATION.cff` and `.zenodo.json` hold the citation metadata used when a GitHub release is archived on Zenodo, which assigns the release a DOI.
+`data/hal-1/` is a checksummed copy of every stored record for protocol `hal-1` (the 95 units behind the leaderboard and the paper), taken from the public bucket on 2026-09-27; its README describes the layout. `CITATION.cff` and `.zenodo.json` hold the citation metadata Zenodo uses when it archives a GitHub release. Release v1.0.0 (code and `data/hal-1/` together) is [10.5281/zenodo.22990641](https://doi.org/10.5281/zenodo.22990641); [10.5281/zenodo.22990640](https://doi.org/10.5281/zenodo.22990640), the DOI in the badge above, always resolves to the latest release.
 
 ## License
 

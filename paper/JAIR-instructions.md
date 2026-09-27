@@ -1,20 +1,20 @@
 # Submitting the paper to JAIR
 
-`jair-submission.tex` is the paper in the Journal of Artificial Intelligence Research format, built on the JAIR Author Kit template dated 15 September 2025 (a customization of ACM's `acmart`). These notes follow JAIR's [submission page](https://www.jair.org/index.php/jair/about/submissions), [formatting page](https://www.jair.org/index.php/jair/formatting), [final preparation guide](https://www.jair.org/index.php/jair/authorinstrs), and the [AI and Society special track](https://www.jair.org/index.php/jair/SpecialTrack-AIandSociety).
+`hal-contradiction-lab.tex` is the paper's single source. Built as it is in this directory, it produces the Journal of Artificial Intelligence Research review version, on the JAIR Author Kit template dated 15 September 2025 (a customization of ACM's `acmart`). These notes follow JAIR's [submission page](https://www.jair.org/index.php/jair/about/submissions), [formatting page](https://www.jair.org/index.php/jair/formatting), [final preparation guide](https://www.jair.org/index.php/jair/authorinstrs), and the [AI and Society special track](https://www.jair.org/index.php/jair/SpecialTrack-AIandSociety).
 
 ## Build
 
-The Author Kit's class files are kept beside the source in this directory: `jair.cls`, `acmart.cls`, `acmauthoryear.bbx`, `acmauthoryear.cbx`, and `acmdatamodel.dbx`. `acmart.cls` is the unmodified acmart v2.12 (2024/12/28) generated from `acmart.dtx` with `acmart.ins`, both included here as its LaTeX Project Public License requires for redistributing a generated file. The Author Kit's own copy of `acmart.cls` is that same version with two warnings commented out (that ACM keywords and CCS concepts are mandatory), which the license does not allow under the original file name, so this directory uses the unmodified class. The output is the same. The three biblatex files are identical to acmart v2.12's. The bibliography is embedded in the `.tex` file and written out as `jair-submission.bib` on the first pass.
+The Author Kit's class files are kept beside the source in this directory: `jair.cls`, `acmart.cls`, `acmauthoryear.bbx`, `acmauthoryear.cbx`, and `acmdatamodel.dbx`. `acmart.cls` is the unmodified acmart v2.12 (2024/12/28) generated from `acmart.dtx` with `acmart.ins`, both included here as its LaTeX Project Public License requires for redistributing a generated file. The Author Kit's own copy of `acmart.cls` is that same version with two warnings commented out (that ACM keywords and CCS concepts are mandatory), which the license does not allow under the original file name, so this directory uses the unmodified class. The output is the same. The three biblatex files are identical to acmart v2.12's. The bibliography is embedded in the `.tex` file and written out as `hal-contradiction-lab.bib` on the first pass. The same source builds the arXiv preprint when `arxiv.flag` is present beside it (see `ARXIV-instructions.md`); never leave that file here when building for JAIR.
 
 ```sh
 cd paper
-pdflatex jair-submission.tex
-biber jair-submission
-pdflatex jair-submission.tex
-pdflatex jair-submission.tex
+pdflatex hal-contradiction-lab.tex
+biber hal-contradiction-lab
+pdflatex hal-contradiction-lab.tex
+pdflatex hal-contradiction-lab.tex
 ```
 
-It needs a TeX Live installation with the Libertine, newtx, and Inconsolata fonts, `biblatex`, `biber`, `pgfplots`, and `listings` (on Debian or Ubuntu: `texlive-latex-extra`, `texlive-fonts-extra`, `texlive-pictures`, `texlive-bibtex-extra`, `texlive-plain-generic`, and `biber`). The template can also be opened on [Overleaf](https://www.overleaf.com/read/hycbzkdksrzz#8106d4). The build should finish with no errors and no undefined references; the only expected warnings are that `jair-submission.bib` was written, that the affiliation has no city, and acmart's notes that ACM keywords and CCS concepts are mandatory, which do not apply to JAIR (its template says to omit both).
+It needs a TeX Live installation with the Libertine, newtx, and Inconsolata fonts, `biblatex`, `biber`, `pgfplots`, and `listings` (on Debian or Ubuntu: `texlive-latex-extra`, `texlive-fonts-extra`, `texlive-pictures`, `texlive-bibtex-extra`, `texlive-plain-generic`, and `biber`). The template can also be opened on [Overleaf](https://www.overleaf.com/read/hycbzkdksrzz#8106d4). The build should finish with no errors and no undefined references; the only expected warnings are that `hal-contradiction-lab.bib` was written, that the affiliation has no city, and acmart's notes that ACM keywords and CCS concepts are mandatory, which do not apply to JAIR (its template says to omit both).
 
 Do not commit the PDF or build output; `.gitignore` excludes them.
 
@@ -39,17 +39,17 @@ Do not commit the PDF or build output; `.gitignore` excludes them.
 2. Choose the AI and Society special track. The source already sets `\JAIRTrack{AI and Society}`.
 3. Enter the title, author, contact information, and abstract as they appear in the PDF. The abstract is also shown as HTML on the JAIR site.
 4. Confirm the submission declarations and answer the three mandatory survey questions at the end of the form.
-5. Upload the review PDF built above. Keep it well under 15 MB.
+5. Upload the review PDF built above (`hal-contradiction-lab.pdf`). Keep it well under 15 MB.
 6. Expect an acknowledgment within three business days (if none arrives, write to editors@jair.org) and a decision in about 8 to 12 weeks.
 
 ## If accepted
 
 1. Make the editor's requested changes within two months.
-2. Switch to the camera-ready class: `\documentclass[]{jair}`.
+2. Switch to the camera-ready class: in the `\else` branch near the top, change `\documentclass[manuscript, screen, review]{jair}` to `\documentclass[]{jair}`.
 3. Replace the template's placeholder values (`\JAIRAE`, `\acmVolume`, `\acmArticle`, `\acmMonth`, `\acmYear`, and `\acmDOI`) with the ones the production editor assigns, and add `\received{...}` and `\received[accepted]{...}` dates before `\maketitle`.
 4. The reproducibility checklist may be removed from the final version.
 5. Keep the CC BY 4.0 footer that the class adds, which confirms agreement with the JAIR Open Access Publication Agreement.
 6. Have the paper proofread by someone other than the author, as JAIR recommends.
 7. If source code is published as an online appendix, sign JAIR's source code release form.
 8. Upload the final PDF and a zip or tar of all source files through the submission's discussion thread.
-9. Update the arXiv entry with the JAIR volume, article number, and DOI.
+9. Update the arXiv entry with the JAIR volume, article number, and DOI (arXiv's journal-reference and DOI fields), and replace its PDF with the accepted version if you wish (see `ARXIV-instructions.md`).

@@ -1,0 +1,21 @@
+{
+  "spec_version": 1,
+  "texlive_version": 2023,
+  "process": {
+    "compiler": "pdflatex"
+  },
+  "sources": [
+    {
+      "filename": "hal-contradiction-lab.tex",
+      "usage": "toplevel"
+    },
+    {
+      "filename": "acmart.dtx",
+      "usage": "ignore"
+    },
+    {
+      "filename": "acmart.ins",
+      "usage": "ignore"
+    }
+  ]
+}

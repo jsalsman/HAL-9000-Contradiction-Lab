@@ -8,6 +8,14 @@ authors:
     affiliation: "TalkNicer, Inc."
     orcid: "https://orcid.org/0000-0002-1715-7990"
 license: Apache-2.0
+doi: 10.5281/zenodo.22990640
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.22990640
+    description: "All versions (resolves to the latest release)"
+  - type: doi
+    value: 10.5281/zenodo.22990641
+    description: "Release v1.0.0 (code and the protocol hal-1 run records)"
 repository-code: "https://github.com/jsalsman/hal-9000-contradiction-lab"
 url: "https://hal9000.talknicer.com"
 keywords:

@@ -29,4 +29,5 @@ paper/*.out
 paper/*.run.xml
 paper/*.toc
 paper/*.cut
-paper/jair-submission.bib
+paper/hal-contradiction-lab.bib
+paper/arxiv-upload.tar.gz
