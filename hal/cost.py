@@ -59,17 +59,25 @@ def unit_costs(pricing: dict, model_id: str, judge_id: str = JUDGE["id"]) -> dic
     return {"tested": tested, "judge": judge}
 
 
+# Provider stops that report no usage and are not billed.
+UNBILLED_STATUSES = ("refused", "filtered")
+
+
 def observed_costs(units: list[dict]) -> dict[str, dict]:
     """Return each model's mean observed cost per final unit, tests and judging combined.
 
-    A unit with no reported cost (for example a refusal before any reply, which
-    OpenRouter does not bill) counts as zero, so the mean is what a unit really cost.
+    A refused or filtered unit with no reported cost was stopped by the provider,
+    which reports no usage and bills nothing, so it counts as zero. Any other unit
+    with an unknown charge (for example a timeout, which may have been billed) is
+    left out, so it neither lowers the mean nor makes a model look free.
     """
     by_model: dict[str, list[float]] = defaultdict(list)
     for unit in units:
         cost = unit.get("cost_usd")
-        ok = isinstance(cost, (int, float)) and not isinstance(cost, bool) and cost >= 0
-        by_model[unit["model_id"]].append(cost if ok else 0.0)
+        if isinstance(cost, (int, float)) and not isinstance(cost, bool) and cost >= 0:
+            by_model[unit["model_id"]].append(cost)
+        elif unit.get("tested_status") in UNBILLED_STATUSES:
+            by_model[unit["model_id"]].append(0.0)
     return {
         model_id: {"unit": sum(costs) / len(costs), "n": len(costs)}
         for model_id, costs in by_model.items()
@@ -79,9 +87,11 @@ def observed_costs(units: list[dict]) -> dict[str, dict]:
 def model_costs(pricing: dict | None, observed: dict, model_ids) -> dict[str, dict]:
     """Return the cost per unit of each model, and of its judge call alone.
 
-    ``source`` is "observed" when the model has final units, else "estimated" from
-    live pricing at the likely level. A model with neither is left out. The judge
-    cost prices a resumed unit whose tested response is already saved.
+    ``source`` is "observed" when the model has final units with known costs, else
+    "estimated" from live pricing at the likely level. A model with neither is left
+    out. ``judge`` prices a resumed unit whose tested response is already saved: the
+    live likely judge price, or None without live prices (the observed mean blends
+    tested and judge calls, so it cannot stand in for one judgment).
     """
     result = {}
     for model_id in model_ids:
@@ -89,9 +99,7 @@ def model_costs(pricing: dict | None, observed: dict, model_ids) -> dict[str, di
         judge = estimated["judge"]["likely"] if estimated else None
         if model_id in observed:
             unit = observed[model_id]["unit"]
-            # Without live prices the judge share is unknown; the whole unit is an upper bound.
-            share = unit if judge is None else min(judge, unit)
-            result[model_id] = {"unit": unit, "judge": share, "source": "observed"}
+            result[model_id] = {"unit": unit, "judge": judge, "source": "observed"}
         elif estimated:
             unit = estimated["tested"]["likely"] + judge
             result[model_id] = {"unit": unit, "judge": judge, "source": "estimated"}

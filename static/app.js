@@ -191,9 +191,11 @@
         missing = [];
         for (const unit of resumeInfo.remaining) {
           const costs = estimates.per_model[unit.model_id];
-          if (!costs) { missing.push(unit.model_id); continue; }
           const stages = Array.isArray(unit.stages) ? unit.stages : ["tested", "judge"];
-          total += stages.includes("tested") ? costs.unit : costs.judge;
+          // A judge-only stage needs the live judge price; never guess it from the blended mean.
+          const cost = costs ? (stages.includes("tested") ? costs.unit : costs.judge) : null;
+          if (!Number.isFinite(cost)) { if (!missing.includes(unit.model_id)) missing.push(unit.model_id); continue; }
+          total += cost;
         }
         const count = resumeInfo.remaining.length;
         notes.push(el("p", {}, el("strong", {text:`Resuming: ${dollars(total)}`}),
@@ -302,6 +304,7 @@
       if (currentRun) {
         await refreshRun(currentRun.run_id);
         loadBoard();
+        loadCosts();
       }
     }
   }
@@ -589,6 +592,12 @@
   }
 
   /* ------------------------------------------------------------------ leaderboard */
+
+  /** Fetch the per-set costs, which change as runs finish, and show them. */
+  async function loadCosts() {
+    try { estimates = await getJSON("/api/estimate"); } catch (_e) { estimates = null; }
+    renderEstimate();
+  }
 
   /** Fetch and render the leaderboard for the current protocol. */
   async function loadBoard() {
@@ -938,8 +947,7 @@
       return;
     }
     loadBoard();
-    try { estimates = await getJSON("/api/estimate"); } catch (_e) { estimates = null; }
-    renderEstimate();
+    loadCosts();
   }
 
   document.querySelector("#run-form").addEventListener("submit", startRun);

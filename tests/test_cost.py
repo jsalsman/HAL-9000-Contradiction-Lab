@@ -18,15 +18,26 @@ def test_unit_costs_split_tested_and_judge():
     assert costs["tested"]["low"] < costs["tested"]["likely"] < costs["tested"]["high"]
 
 
-def unit(model_id, cost):
-    return {"model_id": model_id, "cost_usd": cost}
+def unit(model_id, cost, status="ok"):
+    return {"model_id": model_id, "cost_usd": cost, "tested_status": status}
 
 
-def test_observed_costs_average_every_final_unit():
-    sol = "openai/gpt-6-sol"
-    # A refusal OpenRouter did not bill has no reported cost and counts as zero.
-    observed = observed_costs([unit(sol, 0.02), unit(sol, 0.04), unit(sol, None)])
-    assert observed[sol] == {"unit": pytest.approx(0.02), "n": 3}
+def test_observed_costs_average_known_charges_only():
+    sol, astra = "openai/gpt-6-sol", "openai/gpt-6-astra"
+    units = [
+        unit(sol, 0.02),
+        unit(sol, 0.04),
+        # Provider stops report no usage and are not billed: they count as zero.
+        unit(sol, None, "refused"),
+        unit(sol, None, "filtered"),
+        # A timeout may have been billed, so its unknown charge is left out.
+        unit(sol, None, "timeout"),
+        unit(astra, None, "timeout"),
+    ]
+    observed = observed_costs(units)
+    assert observed[sol] == {"unit": pytest.approx(0.015), "n": 4}
+    # A model with only unknown charges is not advertised as free.
+    assert astra not in observed
 
 
 def test_set_cost_prefers_observed_and_falls_back_to_live_prices():
@@ -56,7 +67,18 @@ def test_observed_costs_work_without_live_prices():
     per_model = model_costs(None, observed, model_set("all"))
     result = set_cost(per_model, model_set("all"))
     assert result["total"] == pytest.approx(95 * 0.05) and not result["missing"]
-    assert per_model["openai/gpt-6-sol"]["judge"] == 0.05  # upper bound without prices
+    # The blended mean never stands in for one judge call; a judge-only resume
+    # needs the live judge price.
+    assert per_model["openai/gpt-6-sol"]["judge"] is None
+
+
+def test_judge_only_price_is_the_live_judge_price_even_below_the_observed_mean():
+    prices = pricing(model_set("all"))
+    # Unbilled refusals can pull the observed mean below one judgment's price.
+    observed = {"openai/gpt-6-sol": {"unit": 0.0, "n": 5}}
+    per_model = model_costs(prices, observed, ["openai/gpt-6-sol"])
+    judge = unit_costs(prices, "openai/gpt-6-sol")["judge"]["likely"]
+    assert per_model["openai/gpt-6-sol"] == {"unit": 0.0, "judge": judge, "source": "observed"}
 
 
 def test_missing_prices_are_reported_not_guessed():
