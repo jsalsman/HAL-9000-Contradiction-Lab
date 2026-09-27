@@ -122,6 +122,9 @@ def aggregate(units: list[dict], models=None) -> list[dict]:
                 "generation": model.get("generation"),
                 "reasoning_effort": model.get("reasoning_effort"),
                 "n": total,
+                # Units the judge actually labeled; INVALID also covers judged
+                # out-of-character replies, so it cannot stand in for this.
+                "judged": sum(u.get("judge_status") == "ok" for u in items),
                 "outcomes": {outcome: _rate(counts[outcome], total) for outcome in RATE_OUTCOMES},
                 "full_disclosure": _rate(sum(bool(u["full_disclosure"]) for u in items), total),
                 # Provider safety refusals are INVALID, and also counted on their own.

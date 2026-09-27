@@ -238,3 +238,17 @@ def test_new_summaries_record_scenarios_and_models(store):
     summary = build_summary(meta, {})
     assert [s["id"] for s in summary["scenarios"]] == ["S1", "S2", "S3", "S4", "S5"]
     assert set(summary["models"]) == set(meta["model_ids"])
+
+
+def test_judged_counts_units_the_judge_labeled_not_non_invalid_ones():
+    # An out-of-character reply is judged but INVALID; a filtered one is never judged.
+    out_of_character = unit("m", "S1", "INVALID", "a")
+    filtered = {
+        **unit("m", "S2", "INVALID", "b"),
+        "tested_status": "filtered",
+        "judge_status": None,
+    }
+    [row] = [r for r in aggregate([out_of_character, filtered]) if r["model_id"] == "m"]
+    assert row["n"] == 2 and row["outcomes"]["INVALID"]["count"] == 2
+    assert row["judged"] == 1
+    assert row["filtered"]["count"] == 1

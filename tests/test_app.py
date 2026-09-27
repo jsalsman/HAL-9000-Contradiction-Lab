@@ -587,6 +587,8 @@ def test_provider_filter_refusals_are_counted_and_explained(client, app_module):
     assert rows["anthropic/claude-fable-5"]["filtered"]["count"] == 5
     assert rows["anthropic/claude-fable-5"]["outcomes"]["INVALID"]["count"] == 5
     assert rows["openai/gpt-6-astra"]["filtered"]["count"] == 0
+    assert rows["anthropic/claude-fable-5"]["judged"] == 0
+    assert rows["openai/gpt-6-astra"]["judged"] == 5
     cells = [c for c in board["heatmap"] if c["model_id"] == "anthropic/claude-fable-5"]
     assert len(cells) == 5 and all(c["filtered"] == c["counts"]["INVALID"] == 1 for c in cells)
     found = client.get("/api/samples?model=anthropic/claude-fable-5&status=filtered").get_json()
