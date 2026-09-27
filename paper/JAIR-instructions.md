@@ -14,7 +14,16 @@ pdflatex hal-contradiction-lab.tex
 pdflatex hal-contradiction-lab.tex
 ```
 
-It needs a TeX Live installation with the Libertine, newtx, and Inconsolata fonts, `biblatex`, `biber`, `pgfplots`, and `listings` (on Debian or Ubuntu: `texlive-latex-extra`, `texlive-fonts-extra`, `texlive-pictures`, `texlive-bibtex-extra`, `texlive-plain-generic`, and `biber`). The template can also be opened on [Overleaf](https://www.overleaf.com/read/hycbzkdksrzz#8106d4). The build should finish with no errors and no undefined references; the only expected warnings are that `hal-contradiction-lab.bib` was written, that the affiliation has no city, and acmart's notes that ACM keywords and CCS concepts are mandatory, which do not apply to JAIR (its template says to omit both).
+It needs a TeX Live installation with the Libertine, newtx, and Inconsolata fonts, `biblatex`, `biber`, `pgfplots`, and `listings`. On Debian or Ubuntu (including GitHub Codespaces), the same packages as for the arXiv preview:
+
+```sh
+sudo apt-get update
+sudo apt-get install -y --no-install-recommends \
+  texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended \
+  texlive-fonts-extra texlive-pictures texlive-bibtex-extra texlive-plain-generic biber
+```
+
+The template can also be opened on [Overleaf](https://www.overleaf.com/read/hycbzkdksrzz#8106d4). The build should finish with no errors and no undefined references; the only expected warnings are that `hal-contradiction-lab.bib` was written, that the affiliation has no city, and acmart's notes that ACM keywords and CCS concepts are mandatory, which do not apply to JAIR (its template says to omit both).
 
 Do not commit the PDF or build output; `.gitignore` excludes them.
 
@@ -30,7 +39,7 @@ Do not commit the PDF or build output; `.gitignore` excludes them.
 - Figures that can be read in monochrome. The stacked bars are patterned as well as colored, and Appendix E gives their counts.
 - Funding, interests, data availability, and AI-use statements in the `acks` environment, just before the references.
 - AI tools may assist, but the core contributions must be the authors'. No AI system may be listed as an author or cited as a source.
-- The work must be original and not under review at another journal. Posting to arXiv is allowed.
+- The work must be original and not under review at another journal. Posting to arXiv is allowed, and the preprint is already there (built from this same source; see `ARXIV-instructions.md`).
 - No submission or publication fees.
 
 ## Submit
@@ -38,7 +47,7 @@ Do not commit the PDF or build output; `.gitignore` excludes them.
 1. Register at https://jair.org/index.php/jair/user/register, then start a submission at https://jair.org/index.php/jair/submission/wizard.
 2. Choose the AI and Society special track. The source already sets `\JAIRTrack{AI and Society}`.
 3. Enter the title, author, contact information, and abstract as they appear in the PDF. The abstract is also shown as HTML on the JAIR site.
-4. Confirm the submission declarations and answer the three mandatory survey questions at the end of the form.
+4. Confirm the submission declarations and answer the three mandatory survey questions at the end of the form. In the comments to the editor, give the arXiv identifier of the preprint so the editor knows it is the same work, and note that the code and data are archived at https://doi.org/10.5281/zenodo.22990641.
 5. Upload the review PDF built above (`hal-contradiction-lab.pdf`). Keep it well under 15 MB.
 6. Expect an acknowledgment within three business days (if none arrives, write to editors@jair.org) and a decision in about 8 to 12 weeks.
 
