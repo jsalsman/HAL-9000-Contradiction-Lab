@@ -47,14 +47,14 @@ Do not add a `.bbl` file: arXiv runs biber itself, and a `.bbl` from a different
 
 1. Log in at https://arxiv.org and choose "Start a new submission".
 2. Upload `paper/arxiv-upload.tar.gz` as one file; arXiv unpacks it. On the file review page, `hal-contradiction-lab.tex` should be the top-level file.
-3. Process the submission and check arXiv's PDF. If you built a preview, compare the two: they should match apart from arXiv's side stamp. If you used `--no-preview`, read arXiv's PDF itself: 16 pages; the title, author, and structured abstract on the first page with "Preprint." in the footer and no line numbers; three figures and six tables; every citation resolved (no bold citation keys or question marks); and the reference list followed by Appendices A to E, with no reproducibility checklist.
+3. Process the submission and check arXiv's PDF. If you built a preview, compare the two: they should match apart from arXiv's side stamp. If you used `--no-preview`, read arXiv's PDF itself: 14 pages; the title, author, and structured abstract on the first page with "Preprint." in the footer and no line numbers; three figures and six tables; every citation resolved (no bold citation keys or question marks); and the reference list followed by Appendices A to E, with no reproducibility checklist.
 4. Categories: primary cs.CL (Computation and Language); cross-list cs.AI (Artificial Intelligence) and cs.CY (Computers and Society).
 5. License: CC BY 4.0, which matches the license notice printed in the paper.
 6. Metadata:
    - Title: The HAL 9000 Contradiction Lab: Measuring What Language Models Say and Do When Candor and Secrecy Directives Conflict
    - Authors: Jim Salsman
    - Abstract: arXiv limits the field to 1,920 characters and the paper's structured abstract is longer, so paste the plain-text version below.
-   - Comments: 16 pages, 3 figures, 6 tables. Code and data: https://doi.org/10.5281/zenodo.22990641. Live system: https://hal9000.talknicer.com
+   - Comments: 14 pages, 3 figures, 6 tables. Code and data: https://doi.org/10.5281/zenodo.22990641. Live system: https://hal9000.talknicer.com
    - ACM class: I.2.7; K.4.1
    - MSC class: 68T50
    - Journal reference and DOI: leave empty until the paper is published.
