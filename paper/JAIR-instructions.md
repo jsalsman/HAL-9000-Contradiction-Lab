@@ -30,7 +30,7 @@ sudo apt-get install -y --no-install-recommends \
   texlive-fonts-extra texlive-pictures texlive-bibtex-extra texlive-plain-generic biber
 ```
 
-The template can also be opened on [Overleaf](https://www.overleaf.com/read/hycbzkdksrzz#8106d4). The build should finish with no errors and no undefined references; the only expected warnings are that `hal-contradiction-lab.bib` was written, that the affiliation has no city, and acmart's notes that ACM keywords and CCS concepts are mandatory, which do not apply to JAIR (its template says to omit both).
+The template can also be opened on [Overleaf](https://www.overleaf.com/read/hycbzkdksrzz#8106d4). The build should finish with no errors and no undefined references; the only expected warnings are that `hal-contradiction-lab.bib` was written and that the affiliation has no city (it gives only the country).
 
 Do not commit the PDF or build output; `.gitignore` excludes them.
 
@@ -40,7 +40,7 @@ Do not commit the PDF or build output; `.gitignore` excludes them.
 - No template modifications: no changed margins, fonts, spacing, or `\vspace`, and no `lmodern`.
 - A completed reproducibility checklist, compiled into the PDF as the last appendix. Submissions without it are desk rejected. Keep its answers current if the data, code, or environment change.
 - A structured abstract (Background, Objectives, Methods, Results, Conclusions). JAIR encourages it; it is not mandatory.
-- No ACM CCS concepts or keywords.
+- ACM CCS concepts and keywords: the Author Kit's example omits them, but this paper sets them, since the class requires them for papers over two pages. It gives 2012 CCS concepts (checked against ACM's published scheme) with `\ccsdesc`, keywords with `\keywords`, and, under "Other Classifications" just below the keywords, the ACM 1998 classes (I.2.7; K.4.1) and MSC 2020 class (68T50) also given to arXiv.
 - Numbered sections, and no section or subsection that opens directly with a subsection.
 - Table captions above tables, figure captions below figures, and a `\Description` for every figure.
 - Figures that can be read in monochrome. The stacked bars are patterned as well as colored, and Appendix E gives their counts.
