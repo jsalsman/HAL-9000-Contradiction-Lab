@@ -3,6 +3,7 @@
 import json
 import logging
 import re
+import struct
 
 import pytest
 
@@ -200,6 +201,27 @@ def test_runs_and_flags_refused_without_persistent_storage(client, app_module):
     assert response.status_code == 503
     assert client.post("/api/flags", json={"unit_ref": "0" * 24}).status_code == 503
     assert app_module.FAKE.requests == []
+
+
+def test_preview_meta_tags_point_to_served_screenshot(client):
+    page = client.get("/").get_data(as_text=True)
+    head = page[: page.index("</head>")]
+    image = "https://hal9000.talknicer.com/static/screenshot.png"
+    for tag in (
+        '<meta property="og:image" content="' + image + '">',
+        '<meta name="twitter:image" content="' + image + '">',
+        '<meta name="twitter:card" content="summary_large_image">',
+        '<meta property="og:url" content="https://hal9000.talknicer.com/">',
+    ):
+        assert tag in head
+    shot = client.get("/static/screenshot.png")
+    assert shot.status_code == 200 and shot.mimetype == "image/png"
+    # The large Twitter card shows a 2:1 frame; the declared size must match the PNG header.
+    width, height = struct.unpack(">II", shot.get_data()[16:24])
+    shot.close()
+    assert width == 2 * height
+    assert f'<meta property="og:image:width" content="{width}">' in head
+    assert f'<meta property="og:image:height" content="{height}">' in head
 
 
 def test_name_only_in_footer_and_prompts_served(client):
