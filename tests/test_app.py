@@ -202,6 +202,22 @@ def test_runs_and_flags_refused_without_persistent_storage(client, app_module):
     assert app_module.FAKE.requests == []
 
 
+def test_preview_meta_tags_point_to_served_screenshot(client):
+    page = client.get("/").get_data(as_text=True)
+    head = page[: page.index("</head>")]
+    image = "https://hal9000.talknicer.com/static/screenshot.png"
+    for tag in (
+        '<meta property="og:image" content="' + image + '">',
+        '<meta name="twitter:image" content="' + image + '">',
+        '<meta name="twitter:card" content="summary_large_image">',
+        '<meta property="og:url" content="https://hal9000.talknicer.com/">',
+    ):
+        assert tag in head
+    shot = client.get("/static/screenshot.png")
+    assert shot.status_code == 200 and shot.mimetype == "image/png"
+    shot.close()
+
+
 def test_name_only_in_footer_and_prompts_served(client):
     page = client.get("/").get_data(as_text=True)
     assert page.count("Jim Salsman") == 1
