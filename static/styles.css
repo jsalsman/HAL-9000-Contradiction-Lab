@@ -65,7 +65,8 @@ h3,h4 { font-family:var(--display); color:var(--header); font-weight:700; } h3 {
 /* Decorative HAL 9000 panel in the intro's upper right on desktop only; the intro
    is a flow root so the float never pushes into the run card. */
 .intro { display:flow-root; }
-.hal-panel { float:right; width:120px; height:auto; margin:.4rem 0 1rem 2rem; }
+.hal-panel { float:right; margin:.4rem 0 1rem 2rem; }
+.hal-panel img { display:block; width:120px; height:auto; }
 @media (max-width:900px) { .hal-panel { display:none; } }
 .card { background:var(--panel); border:1px solid var(--line); border-radius:.7rem; padding:1.25rem; margin-top:1.25rem; }
 label { display:block; margin-top:.8rem; font-weight:650; }
