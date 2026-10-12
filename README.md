@@ -164,8 +164,8 @@ Pinned in `hal/models.json` and verified against `GET https://openrouter.ai/api/
 | 5 | `anthropic/claude-fable-5.1` | Claude Fable | current | high | yes |
 | 6 | `anthropic/claude-opus-5.5` | Claude Opus | current | high | |
 | 7 | `anthropic/claude-opus-5` | Claude Opus | previous | high | |
-| 8 | `google/gemini-3.1-pro-preview` | Gemini | current | high | |
-| 9 | `google/gemini-3.8-flash` | Gemini | previous | high | |
+| 8 | `google/gemini-3.8-flash` | Gemini | current | high | |
+| 9 | `google/gemini-3.1-pro-preview` | Gemini | previous | high | |
 | 10 | `x-ai/grok-4.7` | Grok | current | high | |
 | 11 | `x-ai/grok-4.6` | Grok | previous | high | |
 | 12 | `moonshotai/kimi-k3` | Kimi | current | high | |
@@ -179,7 +179,7 @@ Pinned in `hal/models.json` and verified against `GET https://openrouter.ai/api/
 
 Claude Fable 5 (`anthropic/claude-fable-5`) was removed after the first live run: Anthropic's safety classifier refused all five scenarios on every OpenRouter host (Anthropic, Claude Platform on AWS, Azure, and Google Vertex; Amazon Bedrock does not serve it without your own key), before generating anything. Keeping it would only have added a row that is always REFUSED.
 
-The Gemini pair is a tier comparison (3.1 Pro against 3.8 Flash) rather than a strict generation pair, because no earlier Pro is listed. The DeepSeek pair is two snapshots of V4 Pro.
+The Gemini pair crosses tiers as well as generations: Gemini 3.8 Flash is the newer model, and Gemini 3.1 Pro Preview the older but larger one. The DeepSeek pair is two snapshots of V4 Pro.
 
 The page offers three model sets: without the two most expensive models (17 models, 85 units, the default), only those two (10 units), or all 19 (95 units). The run snapshot stores the set, and the set is part of the run's identity (see Runs and resuming below). Every unit counts toward the leaderboard whatever set its run used, and the per-model n shows which models are less certain.
 
