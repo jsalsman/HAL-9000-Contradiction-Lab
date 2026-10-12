@@ -153,7 +153,8 @@ def load_run(store, run_id: str) -> tuple[dict, str]:
             f"This run used protocol {meta['protocol_version']}; the current protocol is "
             f"{PROTOCOL_VERSION}. Start a new run."
         )
-    if list(model_set(meta["model_set"])) != meta["model_ids"]:
+    # Membership, not order: reordering the catalog must not strand an unfinished run.
+    if sorted(model_set(meta["model_set"])) != sorted(meta["model_ids"]):
         raise RunError("The saved run's model set no longer matches the catalog.")
     return meta, version
 

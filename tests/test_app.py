@@ -380,6 +380,30 @@ def test_old_protocol_snapshots_are_refused(app_module):
         load_run(app_module.STORE, run_id)
 
 
+def test_runs_saved_before_a_catalog_reorder_still_load(app_module):
+    run_id = "b" * 32
+    reordered = list(reversed(model_set("default")))
+    meta = {
+        "run_id": run_id,
+        "protocol_version": PROTOCOL_VERSION,
+        "model_set": "default",
+        "model_ids": reordered,
+        "scenario_ids": ["S1"],
+        "status": "interrupted",
+    }
+    write_json(app_module.STORE, run_name(run_id), meta)
+    loaded, _version = load_run(app_module.STORE, run_id)
+    assert loaded["model_ids"] == reordered
+    write_json(
+        app_module.STORE,
+        run_name(run_id),
+        {**meta, "model_ids": reordered[1:]},
+        if_version=_version,
+    )
+    with pytest.raises(Exception, match="no longer matches"):
+        load_run(app_module.STORE, run_id)
+
+
 def test_active_run_conflict(client, app_module):
     Lease(app_module.STORE, derived_run_id(KEY, "expensive", 1)).acquire()
     response, _ = stream(client, model_set="expensive")
