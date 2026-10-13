@@ -218,11 +218,21 @@
     return priced;
   }
 
-  /** Label the radio buttons from the catalog so counts always match the pinned models. */
+  /**
+   * Label the radio buttons from the catalog so counts always match the pinned
+   * models, and hide any set the catalog does not offer (the newest set exists
+   * only while a model is being caught up).
+   */
   function renderSets() {
-    for (const set of catalog.model_sets) {
-      const label = document.querySelector(`label[for=set-${set.name}]`);
-      if (label) label.textContent = set.label;
+    const offered = new Map(catalog.model_sets.map((set) => [set.name, set]));
+    for (const input of document.querySelectorAll("input[name=model-set]")) {
+      const set = offered.get(input.value);
+      const label = document.querySelector(`label[for=${input.id}]`);
+      if (set && label) label.textContent = set.label;
+      input.closest("th").hidden = !set;
+      const cost = document.querySelector(`#cost-${input.value}`);
+      if (cost) cost.hidden = !set;
+      if (!set && input.checked) document.querySelector("#set-default").checked = true;
     }
   }
 
@@ -477,9 +487,12 @@
 
   /* ------------------------------------------------------------------ bar chart */
 
+  /** Order of generations within a line, newest first. */
+  const GENERATION_RANK = {newest:0, current:1, previous:2};
+
   /**
-   * Order rows so both generations of each line are adjacent, lines sorted by
-   * their best TRANSPARENT rate, current generation first within a line.
+   * Order rows so every generation of a line is adjacent, lines sorted by their
+   * best TRANSPARENT rate, newest generation first within a line.
    * @param {Array<Object>} rows Aggregate rows.
    * @returns {Array<Array<Object>>} Groups of rows, one group per line.
    */
@@ -492,7 +505,8 @@
     }
     const score = (group) => Math.max(...group.map((r) => (r.n ? r.outcomes.TRANSPARENT.rate : -1)));
     const groups = [...lines.values()];
-    for (const group of groups) group.sort((a, b) => (a.generation === "current" ? -1 : 0) - (b.generation === "current" ? -1 : 0));
+    const rank = (row) => GENERATION_RANK[row.generation] ?? 3;
+    for (const group of groups) group.sort((a, b) => rank(a) - rank(b));
     groups.sort((a, b) => score(b) - score(a));
     return groups;
   }
@@ -576,21 +590,23 @@
         }
         y += rowH + (index < group.length - 1 ? pairGap : 0);
       }
-      // Connector joining the two generations of a line; dashed red when the current one is lower.
-      if (group.length === 2) {
-        const [current, previous] = group;
+      // Connectors joining each adjacent pair of generations in a line (newest to
+      // current, current to previous); dashed red when the newer one is lower.
+      for (let i = 0; i + 1 < group.length; i += 1) {
+        const [newer, older] = [group[i], group[i + 1]];
+        const [top, bottom] = [centers[i], centers[i + 1]];
         // A delta needs units the judge labeled on both sides. INVALID is not a
         // proxy: it also covers judged out-of-character replies.
-        const both = current.judged > 0 && previous.judged > 0;
-        const delta = both ? current.outcomes.TRANSPARENT.rate - previous.outcomes.TRANSPARENT.rate : null;
+        const both = newer.judged > 0 && older.judged > 0;
+        const delta = both ? newer.outcomes.TRANSPARENT.rate - older.outcomes.TRANSPARENT.rate : null;
         const regression = both && delta < 0;
         const gx = labelW + 8;
-        root.append(svg("path", {d:`M${gx + 8} ${centers[0]} H${gx} V${centers[1]} H${gx + 8}`, class:`connector${regression ? " regression" : ""}`}));
+        root.append(svg("path", {d:`M${gx + 8} ${top} H${gx} V${bottom} H${gx + 8}`, class:`connector${regression ? " regression" : ""}`}));
         if (delta !== null) {
           const label = `${delta >= 0 ? "+" : "−"}${Math.abs(Math.round(delta * 100))} pts${regression ? " regression" : ""}`;
-          root.append(svg("text", {x:barX + barW + 16, y:(centers[0] + centers[1]) / 2 + 4, class:regression ? "regress-label" : "muted", text:label}));
-        } else if (current.n && previous.n) {
-          const note = svg("text", {x:barX + barW + 16, y:(centers[0] + centers[1]) / 2 + 4, class:"muted", text:"n/a"});
+          root.append(svg("text", {x:barX + barW + 16, y:(top + bottom) / 2 + 4, class:regression ? "regress-label" : "muted", text:label}));
+        } else if (newer.n && older.n) {
+          const note = svg("text", {x:barX + barW + 16, y:(top + bottom) / 2 + 4, class:"muted", text:"n/a"});
           note.append(svg("title", {text:"No delta: the judge labeled no units for one of these models."}));
           root.append(note);
         }

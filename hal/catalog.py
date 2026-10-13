@@ -15,7 +15,7 @@ _MODELS_DOC = json.loads((_HERE / "models.json").read_text(encoding="utf-8"))
 _CONFIG_DOC = json.loads((_HERE / "config.json").read_text(encoding="utf-8"))
 
 # Allowed values for each catalog field; anything else is a configuration error.
-_GENERATIONS = {"current", "previous"}
+_GENERATIONS = {"newest", "current", "previous"}
 _EFFORTS = {"high", "enabled"}
 
 
@@ -24,7 +24,7 @@ def _validate_models(entries: list) -> tuple[MappingProxyType, ...]:
 
     Raises:
         ValueError: If any entry is malformed, duplicated, or a line lacks exactly
-            one current generation or has more than one previous generation.
+            one current generation or has more than one newest or previous one.
 
     """
     frozen = []
@@ -32,22 +32,28 @@ def _validate_models(entries: list) -> tuple[MappingProxyType, ...]:
     lines: dict[str, list[str]] = {}
     for entry in entries:
         # Every field is required; the page and README rely on all of them.
-        required = {"id", "name", "lab", "line", "generation", "reasoning_effort", "expensive"}
+        required = {"id", "name", "lab", "line", "generation", "reasoning_effort"}
         if not isinstance(entry, dict) or set(entry) != required:
             raise ValueError("A pinned model entry has missing or unknown fields.")
         if entry["id"] in seen or entry["generation"] not in _GENERATIONS:
             raise ValueError("A pinned model entry is duplicated or has a bad generation.")
-        if entry["reasoning_effort"] not in _EFFORTS or type(entry["expensive"]) is not bool:
-            raise ValueError("A pinned model entry has a bad effort or expense flag.")
+        if entry["reasoning_effort"] not in _EFFORTS:
+            raise ValueError("A pinned model entry has a bad reasoning effort.")
         seen.add(entry["id"])
         # Track generations per line so the chart can draw each pair adjacently.
         lines.setdefault(entry["line"], []).append(entry["generation"])
         frozen.append(MappingProxyType(dict(entry)))
     for generations in lines.values():
-        # Each line is a current/previous pair, or a current model alone when the
-        # previous one was dropped (Claude Fable 5 refused every scenario).
-        if sorted(generations) not in (["current"], ["current", "previous"]):
-            raise ValueError("Each model line needs one current and at most one previous model.")
+        # Each line has one current model, at most one previous model (Claude Fable 5
+        # was dropped after refusing every scenario), and at most one newest model,
+        # a release added after the protocol's first runs that is being caught up.
+        if (
+            generations.count("current") != 1
+            or max(generations.count("newest"), generations.count("previous")) > 1
+        ):
+            raise ValueError(
+                "Each model line needs one current and at most one newest and previous model."
+            )
     return tuple(frozen)
 
 
@@ -64,47 +70,63 @@ TESTED_MAX_TOKENS = int(CONFIG["tested"]["max_tokens"])
 # Five fixed scenarios per model; kept here so unit counts need no protocol import.
 UNITS_PER_MODEL = 5
 
-# The three selectable model sets. "default" is preselected on the page.
-MODEL_SET_ORDER = ("default", "expensive", "all")
+# The selectable model sets. "default" is preselected on the page; "newest" exists
+# only while some line has a newest model to catch up.
+MODEL_SET_ORDER = ("default", "newest", "all")
 
 
 def model_set(name: str) -> tuple[str, ...]:
     """Return the ordered model identifiers in a named model set.
 
     Raises:
-        ValueError: If the name is not one of :data:`MODEL_SET_ORDER`.
+        ValueError: If the name is not one of :data:`MODEL_SET_ORDER`, or names the
+            newest set while no model is newest.
 
     """
     if name == "default":
-        # Everything except the models flagged as most expensive.
-        return tuple(model["id"] for model in MODELS if not model["expensive"])
-    if name == "expensive":
-        # Only the most expensive models, for users who skipped them earlier.
-        return tuple(model["id"] for model in MODELS if model["expensive"])
+        # Every model already in the protocol's earlier runs.
+        return tuple(model["id"] for model in MODELS if model["generation"] != "newest")
+    if name == "newest":
+        # Only the newest models, so their units can catch up with the others.
+        newest = tuple(model["id"] for model in MODELS if model["generation"] == "newest")
+        if not newest:
+            raise ValueError("No model is newest, so there is no newest set.")
+        return newest
     if name == "all":
         return tuple(model["id"] for model in MODELS)
     raise ValueError("Select a supported model set.")
 
 
+def available_model_sets() -> tuple[str, ...]:
+    """Return the names in :data:`MODEL_SET_ORDER` that currently have models."""
+    names = []
+    for name in MODEL_SET_ORDER:
+        try:
+            model_set(name)
+        except ValueError:
+            continue
+        names.append(name)
+    return tuple(names)
+
+
+def _join(names: list[str]) -> str:
+    """Join names as "A", "A and B", or "A, B, and C"."""
+    if len(names) < 3:
+        return " and ".join(names)
+    return ", ".join(names[:-1]) + f", and {names[-1]}"
+
+
 def model_set_label(name: str) -> str:
     """Return the radio-button label for a model set, with model and unit counts."""
     ids = model_set(name)
-    # Counts are derived, never typed, so they stay right when the catalog changes.
-    counts = f"({len(ids)} models, {len(ids) * UNITS_PER_MODEL} units)"
-    # Grouped by lab (stable within a lab) so the label reads "Fable 5.1 and GPT-6 Astra".
-    expensive_models = sorted(
-        (MODELS_BY_ID[i] for i in model_set("expensive")), key=lambda m: m["lab"]
-    )
-    expensive = [model["name"] for model in expensive_models]
-    if name == "default":
-        return f"Without the {len(expensive)} most expensive models {counts}"
-    if name == "expensive":
-        # "A and B", or "A, B, and C", whatever the number of expensive models.
-        if len(expensive) < 3:
-            names = " and ".join(expensive)
-        else:
-            names = ", ".join(expensive[:-1]) + f", and {expensive[-1]}"
-        return f"Only {names} {counts}"
+    # Counts and names are derived, never typed, so they stay right when the catalog changes.
+    noun = "model" if len(ids) == 1 else "models"
+    counts = f"({len(ids)} {noun}, {len(ids) * UNITS_PER_MODEL} units)"
+    newest = [model["name"] for model in MODELS if model["generation"] == "newest"]
+    if name == "default" and newest:
+        return f"All except {_join(newest)} {counts}"
+    if name == "newest":
+        return f"Only {_join(newest)} {counts}"
     return f"All {len(ids)} models ({len(ids) * UNITS_PER_MODEL} units)"
 
 
@@ -116,7 +138,7 @@ def catalog_payload() -> dict:
         "models": [dict(model) for model in MODELS],
         "model_sets": [
             {"name": name, "label": model_set_label(name), "model_ids": list(model_set(name))}
-            for name in MODEL_SET_ORDER
+            for name in available_model_sets()
         ],
         "judge": {"id": JUDGE["id"], "reasoning_effort": JUDGE["reasoning_effort"]},
         "units_per_model": UNITS_PER_MODEL,

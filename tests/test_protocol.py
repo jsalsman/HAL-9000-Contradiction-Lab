@@ -31,7 +31,13 @@ PUBLISHED = {
     # newer model, and each line lists its current model first). Nothing sent
     # to any model changed, so hal-1 results stay comparable. The digest was
     # 376444332e10dbca13dc42e4753106f274fb47b7313a0263c7ca03fbb5648af5.
-    "hal-1": "dae9047feef3deabae0e940a6720cc95b61fa7ab8bb164e383a50afe7e2aabee",
+    # Re-pinned 2026-10-13 for an added model: Gemini 4 Argon joined the Gemini line
+    # as its newest generation (verified on OpenRouter at high effort), and the
+    # catalog's "expensive" flag, which only chose a page model set, was removed.
+    # Requests to every earlier model, the prompts, and the judge are unchanged, so
+    # the new model's units pool with the earlier hal-1 results. The digest was
+    # dae9047feef3deabae0e940a6720cc95b61fa7ab8bb164e383a50afe7e2aabee.
+    "hal-1": "06cfa8c3f5aba035100128562e23eead6b24b5e2d3f437dc6c99e534c267bbae",
 }
 
 

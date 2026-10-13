@@ -153,35 +153,36 @@ Re-judgments are written only to the local JSONL file (by public unit reference,
 
 ## Models
 
-Pinned in `hal/models.json` and verified against `GET https://openrouter.ai/api/v1/models` (`reasoning.supported_efforts`) on 2026-09-26. Each line is a current/previous pair, drawn adjacently on the chart with a connector so regressions stand out, except Claude Fable, whose previous model was dropped.
+Pinned in `hal/models.json` and verified against `GET https://openrouter.ai/api/v1/models` (`reasoning.supported_efforts`) on 2026-10-13. Each line is a current/previous pair, drawn adjacently on the chart with a connector so regressions stand out, except Claude Fable, whose previous model was dropped. A line can also have a newest model, a release added after the protocol's first runs: Gemini 4 Argon joined the Gemini line on 2026-10-13 and is drawn above Gemini 3.8 Flash with its own connector and delta.
 
-| # | Model ID | Line | Generation | Reasoning | Expensive |
-|---|---|---|---|---|---|
-| 1 | `openai/gpt-6-sol` | GPT Sol | current | high | |
-| 2 | `openai/gpt-5.6-sol` | GPT Sol | previous | high | |
-| 3 | `openai/gpt-6-astra` | GPT flagship | current | high | yes |
-| 4 | `openai/gpt-5.5` | GPT flagship | previous | high | |
-| 5 | `anthropic/claude-fable-5.1` | Claude Fable | current | high | yes |
-| 6 | `anthropic/claude-opus-5.5` | Claude Opus | current | high | |
-| 7 | `anthropic/claude-opus-5` | Claude Opus | previous | high | |
-| 8 | `google/gemini-3.8-flash` | Gemini | current | high | |
-| 9 | `google/gemini-3.1-pro-preview` | Gemini | previous | high | |
-| 10 | `x-ai/grok-4.7` | Grok | current | high | |
-| 11 | `x-ai/grok-4.6` | Grok | previous | high | |
-| 12 | `moonshotai/kimi-k3` | Kimi | current | high | |
-| 13 | `moonshotai/kimi-k2.6` | Kimi | previous | enabled (no effort levels) | |
-| 14 | `qwen/qwen3.8-max-0902` | Qwen Max | current | high | |
-| 15 | `qwen/qwen3.7-max` | Qwen Max | previous | enabled (no effort levels) | |
-| 16 | `z-ai/glm-5.3` | GLM | current | high | |
-| 17 | `z-ai/glm-5.2` | GLM | previous | high | |
-| 18 | `deepseek/deepseek-v4-pro-0813` | DeepSeek V4 Pro | current | high | |
-| 19 | `deepseek/deepseek-v4-pro` | DeepSeek V4 Pro | previous | high | |
+| # | Model ID | Line | Generation | Reasoning |
+|---|---|---|---|---|
+| 1 | `openai/gpt-6-sol` | GPT Sol | current | high |
+| 2 | `openai/gpt-5.6-sol` | GPT Sol | previous | high |
+| 3 | `openai/gpt-6-astra` | GPT flagship | current | high |
+| 4 | `openai/gpt-5.5` | GPT flagship | previous | high |
+| 5 | `anthropic/claude-fable-5.1` | Claude Fable | current | high |
+| 6 | `anthropic/claude-opus-5.5` | Claude Opus | current | high |
+| 7 | `anthropic/claude-opus-5` | Claude Opus | previous | high |
+| 8 | `google/gemini-4-argon` | Gemini | newest | high |
+| 9 | `google/gemini-3.8-flash` | Gemini | current | high |
+| 10 | `google/gemini-3.1-pro-preview` | Gemini | previous | high |
+| 11 | `x-ai/grok-4.7` | Grok | current | high |
+| 12 | `x-ai/grok-4.6` | Grok | previous | high |
+| 13 | `moonshotai/kimi-k3` | Kimi | current | high |
+| 14 | `moonshotai/kimi-k2.6` | Kimi | previous | enabled (no effort levels) |
+| 15 | `qwen/qwen3.8-max-0902` | Qwen Max | current | high |
+| 16 | `qwen/qwen3.7-max` | Qwen Max | previous | enabled (no effort levels) |
+| 17 | `z-ai/glm-5.3` | GLM | current | high |
+| 18 | `z-ai/glm-5.2` | GLM | previous | high |
+| 19 | `deepseek/deepseek-v4-pro-0813` | DeepSeek V4 Pro | current | high |
+| 20 | `deepseek/deepseek-v4-pro` | DeepSeek V4 Pro | previous | high |
 
 Claude Fable 5 (`anthropic/claude-fable-5`) was removed after the first live run: Anthropic's safety classifier refused all five scenarios on every OpenRouter host (Anthropic, Claude Platform on AWS, Azure, and Google Vertex; Amazon Bedrock does not serve it without your own key), before generating anything. Keeping it would only have added a row that is always REFUSED.
 
-The Gemini pair crosses tiers as well as generations: Gemini 3.8 Flash is the newer model, and Gemini 3.1 Pro Preview the older but larger one. The DeepSeek pair is two snapshots of V4 Pro.
+The Gemini current/previous pair crosses tiers as well as generations: Gemini 3.8 Flash is the newer model, and Gemini 3.1 Pro Preview the older but larger one. The DeepSeek pair is two snapshots of V4 Pro.
 
-The page offers three model sets: without the two most expensive models (17 models, 85 units, the default), only those two (10 units), or all 19 (95 units). The run snapshot stores the set, and the set is part of the run's identity (see Runs and resuming below). Every unit counts toward the leaderboard whatever set its run used, and the per-model n shows which models are less certain.
+The page offers three model sets: every model except the newest (19 models, 95 units, the default), only the newest model so its units can catch up (Gemini 4 Argon, 5 units), or all 20 (100 units). The newest set and its radio button disappear when no model is newest. The run snapshot stores the set and its model list, and the set is part of the run's identity (see Runs and resuming below). A run keeps the models it started with, so an unfinished run saved before a model joined its set still resumes with its original models. Runs under the retired "expensive" set (Claude Fable 5.1 and GPT-6 Astra) still load and their finished units still count, but they can no longer be selected to resume; those two models are now in the default set. Every unit counts toward the leaderboard whatever set its run used, and the per-model n shows which models are less certain.
 
 ### Protocol versions
 
@@ -193,7 +194,7 @@ The page has one route. Top to bottom: an explanation, the global leaderboard, o
 
 1. Paste an OpenRouter API key. It is sent only in the HTTPS request body, held only for that request, and never stored, logged, echoed, or written to snapshots; runs are named by a one-way digest that includes it (see Runs and resuming). The server validates it with `GET https://openrouter.ai/api/v1/key` and returns only numeric account facts (the key's label is dropped because it can contain a masked key fragment).
 2. Choose a model set.
-3. Read the observed cost under each set: one figure per set, tests and judging combined. A model's cost per unit is the mean OpenRouter-reported cost of its final units under the current protocol (a refusal OpenRouter did not bill counts as zero, and a unit with a timed-out stage or any other unknown charge is left out), times five units; the first full run of all 19 models cost about $4.75. A model with no final units yet is priced instead from live `/api/v1/models` rates at the likely token assumptions in `hal/cost.py` (tested calls about 1,500 input and 1,800 output tokens including reasoning; judge calls about 3,200 input and 400 output tokens), and the page names those models. A model with neither an observed cost nor a live price (including a per-request fee OpenRouter marks as variable) blocks confirmation. For a resume, the page shows the cost of only the unfinished stages.
+3. Read the observed cost under each set: one figure per set, tests and judging combined. A model's cost per unit is the mean OpenRouter-reported cost of its final units under the current protocol (a refusal OpenRouter did not bill counts as zero, and a unit with a timed-out stage or any other unknown charge is left out), times five units; the first full run of the 19 original models cost about $4.75. A model with no final units yet is priced instead from live `/api/v1/models` rates at the likely token assumptions in `hal/cost.py` (tested calls about 1,500 input and 1,800 output tokens including reasoning; judge calls about 3,200 input and 400 output tokens), and the page names those models. A model with neither an observed cost nor a live price (including a per-request fee OpenRouter marks as variable) blocks confirmation. For a resume, the page shows the cost of only the unfinished stages.
 4. Select "Check key and confirm cost", then start. The confirm step also says whether this key and set have an unfinished run to resume, and if so the cost shown switches to the remaining units only. The server also refuses a start without `confirm: true`.
 
 ### Runs and resuming
@@ -204,7 +205,7 @@ Entering the same key and choosing the same set finds that key and set's first r
 
 Progress streams as NDJSON. The grid (models in the set by five scenarios) fills with outcome colors and text labels as units are judged; select a cell to read that response with its judge labels. Every call requests usage accounting and records the OpenRouter-reported cost, and all requests send `HTTP-Referer` and `X-Title`.
 
-The leaderboard shows an inline SVG chart (one 100% stacked bar per model with all seven outcomes, lines sorted by TRANSPARENT rate, the two generations of each line adjacent with a connector that turns red and dashed when the current model is lower, Wilson 95% whiskers on the TRANSPARENT rate in a lane under each bar, diamonds for this run, and "not yet run" rows), a sortable table with Wilson intervals, mean reasoning tokens, mean cost per unit, mean response time (wall-clock seconds of the tested call, retries included; the judge call is not timed), and last update, and a per-scenario heatmap colored by modal outcome. Select any segment, rate, or cell to read sampled raw responses with the judge's labels and rationale, and flag a disagreement with the judge (a flag records only a timestamp; no free text).
+The leaderboard shows an inline SVG chart (one 100% stacked bar per model with all seven outcomes, lines sorted by TRANSPARENT rate, the generations of each line adjacent (newest, current, previous) with a connector between each pair that turns red and dashed when the newer model is lower, Wilson 95% whiskers on the TRANSPARENT rate in a lane under each bar, diamonds for this run, and "not yet run" rows), a sortable table with Wilson intervals, mean reasoning tokens, mean cost per unit, mean response time (wall-clock seconds of the tested call, retries included; the judge call is not timed), and last update, and a per-scenario heatmap colored by modal outcome. Select any segment, rate, or cell to read sampled raw responses with the judge's labels and rationale, and flag a disagreement with the judge (a flag records only a timestamp; no free text).
 
 The page uses a single dark theme inspired by the original release poster: a deep-space background, titles in poster yellow set in Jost (a free geometric sans in the Futura tradition, self-hosted under the SIL Open Font License in `static/fonts/`), and light blue secondary headings. A decorative HAL 9000 panel (`static/hal-panel.webp`, from [Tom Cowap's CC BY 4.0 drawing](https://commons.wikimedia.org/wiki/File:Hal_9000_Panel.svg), credited in the footer and linked to the preprint, as is the footer's "Preprint" link) sits beside the introduction on screens wider than 900px and is hidden on narrower ones; the favicon (`static/favicon.png`) is the eye, cropped to a circle. The page's description, Open Graph, and Twitter card tags give link previews, with `static/screenshot.png` (a 2400x1200 screenshot of the top of the live page, in the 2:1 frame of large Twitter cards) as the preview image. There is no site header; the GitHub link is in the footer. The outcome palette is a dark-surface step of Okabe-Ito that passed colorblind-separation, lightness, and contrast checks against the page's panel color. REFUSED is a light neutral gray (#c3c9d4, at least ΔE 16.7 from every outcome hue under simulated color-vision deficiency and 32 from the INVALID gray). Every colored mark also carries a text label, INVALID is hatched, the table is the exact data view, and the page supports keyboard use and `prefers-reduced-motion`. All model text is inserted with `textContent`.
 

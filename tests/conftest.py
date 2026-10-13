@@ -2,6 +2,7 @@
 
 import importlib.util
 from pathlib import Path
+from types import MappingProxyType
 
 import pytest
 
@@ -17,6 +18,28 @@ ROOT = Path(__file__).parents[1]
 def store(tmp_path):
     """Return an empty local store."""
     return LocalStore(tmp_path / "experiments")
+
+
+# The two models the tests run as the small newest set: one can fail while the other works.
+TWO_NEWEST = ("openai/gpt-6-astra", "anthropic/claude-fable-5.1")
+
+
+@pytest.fixture()
+def two_newest(monkeypatch):
+    """Make two pinned models the newest set, so a test can mix a failing and a working model.
+
+    ``model_set`` reads ``hal.catalog.MODELS`` at call time, so every module sees the
+    patched sets; the pinned entries themselves (``MODELS_BY_ID``) are unchanged.
+    """
+    import hal.catalog as catalog
+
+    def generation(model):
+        if model["id"] in TWO_NEWEST:
+            return "newest"
+        return "current" if model["generation"] == "newest" else model["generation"]
+
+    models = tuple(MappingProxyType({**m, "generation": generation(m)}) for m in catalog.MODELS)
+    monkeypatch.setattr(catalog, "MODELS", models)
 
 
 @pytest.fixture()
