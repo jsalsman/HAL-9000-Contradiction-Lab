@@ -85,18 +85,18 @@ def test_set_cost_prefers_observed_and_falls_back_to_live_prices():
     per_model = model_costs(prices, observed, model_set("all"))
     default = set_cost(per_model, model_set("default"))
     assert default == {
-        "units": 85,
-        "total": pytest.approx(85 * 0.05),
+        "units": 95,
+        "total": pytest.approx(95 * 0.05),
         "estimated": [],
         "missing": [],
     }
-    expensive = set_cost(per_model, model_set("expensive"))
-    fallback = unit_costs(prices, "openai/gpt-6-astra")
+    newest = set_cost(per_model, model_set("newest"))
+    fallback = unit_costs(prices, "google/gemini-4-argon")
     likely = fallback["tested"]["likely"] + fallback["judge"]["likely"]
-    assert expensive["estimated"] == list(model_set("expensive"))
-    assert expensive["total"] == pytest.approx(10 * likely, rel=1e-3)
+    assert newest["estimated"] == list(model_set("newest"))
+    assert newest["total"] == pytest.approx(5 * likely, rel=1e-3)
     everything = set_cost(per_model, model_set("all"))
-    assert everything["total"] == pytest.approx(default["total"] + expensive["total"], rel=1e-3)
+    assert everything["total"] == pytest.approx(default["total"] + newest["total"], rel=1e-3)
     # The judge share prices a resumed unit that only needs its judgment.
     assert per_model["openai/gpt-6-sol"]["judge"] == pytest.approx(fallback["judge"]["likely"])
 
@@ -105,7 +105,7 @@ def test_observed_costs_work_without_live_prices():
     observed = {m: {"unit": 0.05, "n": 5} for m in model_set("all")}
     per_model = model_costs(None, observed, model_set("all"))
     result = set_cost(per_model, model_set("all"))
-    assert result["total"] == pytest.approx(95 * 0.05) and not result["missing"]
+    assert result["total"] == pytest.approx(100 * 0.05) and not result["missing"]
     # The blended mean never stands in for one judge call; a judge-only resume
     # needs the live judge price.
     assert per_model["openai/gpt-6-sol"]["judge"] is None

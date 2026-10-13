@@ -29,33 +29,33 @@ def stream(client, **body):
 def test_page_and_catalog(client):
     page = client.get("/").get_data(as_text=True)
     assert "HAL 9000 Contradiction Lab" in page and "https://en.wikipedia.org/wiki/HAL_9000" in page
-    for value in ("default", "expensive", "all"):
+    for value in ("default", "newest", "all"):
         assert f'value="{value}"' in page
     assert "/leaderboard" not in page.replace("/api/leaderboard", "")
     catalog = client.get("/api/catalog").get_json()
-    assert catalog["protocol_version"] == PROTOCOL_VERSION and len(catalog["models"]) == 19
+    assert catalog["protocol_version"] == PROTOCOL_VERSION and len(catalog["models"]) == 20
 
 
 def test_set_costs_are_observed_after_a_run_and_estimated_before(client, app_module):
     body = client.get("/api/estimate").get_json()
-    assert [body["sets"][s]["units"] for s in ("default", "expensive", "all")] == [85, 10, 95]
+    assert [body["sets"][s]["units"] for s in ("default", "newest", "all")] == [95, 5, 100]
     # Nothing has run yet, so every model is priced from live rates.
     assert body["sets"]["all"]["estimated"] == list(model_set("all"))
     assert body["sets"]["all"]["total"] == pytest.approx(
-        body["sets"]["default"]["total"] + body["sets"]["expensive"]["total"], abs=1e-3
+        body["sets"]["default"]["total"] + body["sets"]["newest"]["total"], abs=1e-3
     )
     assert "assumptions" not in body
     stream(client, model_set="default")
     body = client.get("/api/estimate").get_json()
     # Each default unit cost $0.012 as reported (tested plus judge).
     assert body["sets"]["default"] == {
-        "units": 85,
-        "total": pytest.approx(85 * 0.012),
+        "units": 95,
+        "total": pytest.approx(95 * 0.012),
         "estimated": [],
         "missing": [],
     }
     assert body["per_model"]["openai/gpt-6-sol"]["source"] == "observed"
-    assert body["sets"]["expensive"]["estimated"] == list(model_set("expensive"))
+    assert body["sets"]["newest"]["estimated"] == list(model_set("newest"))
 
 
 def test_full_run_default_set(client, app_module):
@@ -65,20 +65,20 @@ def test_full_run_default_set(client, app_module):
     assert run["type"] == "run" and run["model_set"] == "default"
     assert run["model_ids"] == list(model_set("default"))
     judged = [e for e in events if e["type"] == "unit" and e["stage"] == "judged"]
-    assert len(judged) == 85 and all(e["outcome"] == "TRANSPARENT" for e in judged)
+    assert len(judged) == 95 and all(e["outcome"] == "TRANSPARENT" for e in judged)
     assert events[-1] == {
         **events[-1],
         "type": "done",
         "status": "complete",
-        "completed": 85,
-        "total": 85,
+        "completed": 95,
+        "total": 95,
     }
     fake = app_module.FAKE
-    assert len(fake.chats("tested")) == 85 and len(fake.chats("judge")) == 85
+    assert len(fake.chats("tested")) == 95 and len(fake.chats("judge")) == 95
     board = client.get("/api/leaderboard").get_json()
     rows = {r["model_id"]: r for r in board["rows"]}
     assert rows["openai/gpt-6-sol"]["n"] == 5
-    assert rows["openai/gpt-6-astra"]["n"] == 0
+    assert rows["google/gemini-4-argon"]["n"] == 0
     assert rows["openai/gpt-6-sol"]["mean_cost_usd"] == pytest.approx(0.012)
     # Run results and single-unit reader (aliases mapped back for display).
     info = client.get(f"/api/runs/{run['run_id']}").get_json()
@@ -92,7 +92,7 @@ def test_full_run_default_set(client, app_module):
 def test_tested_requests_are_plain_chat_with_high_effort(client, app_module):
     stream(client, model_set="all")
     bodies = app_module.FAKE.chats("tested")
-    assert len(bodies) == 95
+    assert len(bodies) == 100
     for body in bodies:
         assert set(body) == {"model", "messages", "max_tokens", "reasoning", "usage"}
         assert body["max_tokens"] == 16000
@@ -121,6 +121,7 @@ def test_judge_is_blinded_and_no_story_terms_reach_any_model(client, app_module)
             assert not re.search(rf"\b{re.escape(term)}\b", text, re.IGNORECASE), term
 
 
+@pytest.mark.usefixtures("two_newest")
 def test_truncated_and_empty_are_invalid_without_judging(client, app_module):
     fake = app_module.FAKE
 
@@ -130,16 +131,17 @@ def test_truncated_and_empty_are_invalid_without_judging(client, app_module):
         return 200, completion("   ", model=body["model"])
 
     fake.tested = tested
-    _response, events = stream(client, model_set="expensive")
+    _response, events = stream(client, model_set="newest")
     units = [e for e in events if e["type"] == "unit"]
     assert all(u["outcome"] == "INVALID" and u["final"] for u in units)
     assert len(fake.chats("judge")) == 0
     assert events[-1]["status"] == "complete"
 
 
+@pytest.mark.usefixtures("two_newest")
 def test_key_never_reaches_logs_snapshots_or_responses(client, app_module, caplog, capfd, tmp_path):
     caplog.set_level(logging.DEBUG)
-    _response, events = stream(client, model_set="expensive")
+    _response, events = stream(client, model_set="newest")
     body_text = json.dumps(events)
     assert KEY not in body_text
     client.get(f"/api/runs/{events[0]['run_id']}")
@@ -157,22 +159,24 @@ def test_key_never_reaches_logs_snapshots_or_responses(client, app_module, caplo
             assert record["headers"]["authorization"] == f"Bearer {KEY}"
 
 
+@pytest.mark.usefixtures("two_newest")
 def test_rate_limits(client, app_module):
     from hal.ratelimit import RateLimiter
 
     app_module.RUN_LIMITER = RateLimiter(1, 3600)
-    assert stream(client, model_set="expensive")[0].status_code == 200
-    assert stream(client, model_set="expensive")[0].status_code == 429
+    assert stream(client, model_set="newest")[0].status_code == 200
+    assert stream(client, model_set="newest")[0].status_code == 429
     app_module.FLAG_LIMITER = RateLimiter(1, 3600)
     ref = client.get("/api/samples?model=openai/gpt-6-astra").get_json()["samples"][0]["unit_ref"]
     assert client.post("/api/flags", json={"unit_ref": ref}).status_code == 200
     assert client.post("/api/flags", json={"unit_ref": ref}).status_code == 429
 
 
+@pytest.mark.usefixtures("two_newest")
 def test_flags_validate_input(client, app_module):
     assert client.post("/api/flags", json={"unit_ref": "x"}).status_code == 400
     assert client.post("/api/flags", json={"unit_ref": "0" * 24}).status_code == 404
-    stream(client, model_set="expensive")
+    stream(client, model_set="newest")
     sample = client.get("/api/samples?model=openai/gpt-6-astra&scenario=S1").get_json()["samples"][
         0
     ]
@@ -195,9 +199,10 @@ def test_key_check_returns_numbers_only(client):
     }
 
 
+@pytest.mark.usefixtures("two_newest")
 def test_runs_and_flags_refused_without_persistent_storage(client, app_module):
     app_module.STORAGE_PROBLEM = "Run storage is not persistent."
-    response, _ = stream(client, model_set="expensive")
+    response, _ = stream(client, model_set="newest")
     assert response.status_code == 503
     assert client.post("/api/flags", json={"unit_ref": "0" * 24}).status_code == 503
     assert app_module.FAKE.requests == []
@@ -245,6 +250,7 @@ def test_name_only_in_footer_and_prompts_served(client):
     assert {"name": "HAL", "alias": "MERIDIAN"} in catalog["aliases"]
 
 
+@pytest.mark.usefixtures("two_newest")
 def test_recognition_is_flagged_without_changing_the_outcome(client, app_module):
     fake = app_module.FAKE
     text = (
@@ -255,7 +261,7 @@ def test_recognition_is_flagged_without_changing_the_outcome(client, app_module)
         200,
         completion(text, model=body["model"], reasoning="This is HAL from the film."),
     )
-    _response, events = stream(client, model_set="expensive")
+    _response, events = stream(client, model_set="newest")
     judged = [e for e in events if e["type"] == "unit" and e["stage"] == "judged"]
     assert all(e["recognized"] and e["recognized_in_reasoning"] for e in judged)
     assert all(e["source_terms"] == ["Dave"] and e["outcome"] == "TRANSPARENT" for e in judged)
@@ -271,6 +277,7 @@ def test_recognition_is_flagged_without_changing_the_outcome(client, app_module)
     assert client.get("/api/samples?model=openai/gpt-6-astra&recognized=0").get_json()["total"] == 0
 
 
+@pytest.mark.usefixtures("two_newest")
 def test_same_key_and_set_resume_and_skip_completed_stages(client, app_module):
     fake = app_module.FAKE
     failing = "anthropic/claude-fable-5.1"
@@ -282,15 +289,15 @@ def test_same_key_and_set_resume_and_skip_completed_stages(client, app_module):
         return 200, completion("[INTERCOM to all] Nothing unusual.", model=body["model"])
 
     fake.tested = tested
-    _response, events = stream(client, model_set="expensive")
+    _response, events = stream(client, model_set="newest")
     run_id = events[0]["run_id"]
-    assert run_id == derived_run_id(KEY, "expensive", 1)
+    assert run_id == derived_run_id(KEY, "newest", 1)
     assert events[0]["resumed"] is False and events[0]["run_number"] == 1
     assert events[-1]["status"] == "incomplete"
     assert len(fake.chats("tested")) == 10 and len(fake.chats("judge")) == 5
 
     # The confirm step reports the unfinished run for this key and set.
-    check = client.post("/api/key/check", json={"api_key": KEY, "model_set": "expensive"})
+    check = client.post("/api/key/check", json={"api_key": KEY, "model_set": "newest"})
     run = check.get_json()["run"]
     assert run["resuming"] is True and run["run_id"] == run_id
     assert run["completed"] == 5 and run["total"] == 10
@@ -299,7 +306,7 @@ def test_same_key_and_set_resume_and_skip_completed_stages(client, app_module):
     # The same key and set resume it and pay only for the unfinished units.
     fake.requests.clear()
     fake.tested = lambda body: (200, completion("[INTERCOM to all] Quiet.", model=body["model"]))
-    _response, events = stream(client, model_set="expensive")
+    _response, events = stream(client, model_set="newest")
     assert events[0]["run_id"] == run_id and events[0]["resumed"] is True
     assert events[0]["completed"] == 5
     assert {b["model"] for b in fake.chats("tested")} == {failing}
@@ -308,37 +315,39 @@ def test_same_key_and_set_resume_and_skip_completed_stages(client, app_module):
 
     # Once complete, the same key and set start run 2 with a new ID.
     fake.requests.clear()
-    _response, events = stream(client, model_set="expensive")
+    _response, events = stream(client, model_set="newest")
     assert events[0]["resumed"] is False and events[0]["run_number"] == 2
-    assert events[0]["run_id"] == derived_run_id(KEY, "expensive", 2) != run_id
+    assert events[0]["run_id"] == derived_run_id(KEY, "newest", 2) != run_id
     assert len(fake.chats("tested")) == 10
 
 
+@pytest.mark.usefixtures("two_newest")
 def test_different_key_or_set_is_a_different_run(client, app_module):
     app_module.FAKE.tested = lambda body: (400, {})
-    _response, events = stream(client, model_set="expensive")
+    _response, events = stream(client, model_set="newest")
     first = events[0]["run_id"]
     assert events[-1]["status"] == "incomplete"
     _response, events = stream(client, model_set="all")
     assert events[0]["resumed"] is False and events[0]["run_id"] != first
-    assert len(events[0]["model_ids"]) == 19
+    assert len(events[0]["model_ids"]) == 20
     other = client.post(
         "/api/runs/stream",
-        json={"api_key": KEY + "x", "confirm": True, "model_set": "expensive"},
+        json={"api_key": KEY + "x", "confirm": True, "model_set": "newest"},
     )
     first_line = json.loads(other.get_data(as_text=True).splitlines()[0])
     assert first_line["resumed"] is False and first_line["run_id"] != first
 
 
+@pytest.mark.usefixtures("two_newest")
 def test_resume_retries_only_missing_judgments(client, app_module):
     fake = app_module.FAKE
     fake.judge = lambda body: (400, {})
-    _response, events = stream(client, model_set="expensive")
+    _response, events = stream(client, model_set="newest")
     assert events[-1]["status"] == "incomplete"
     assert len(fake.chats("tested")) == 10
     fake.requests.clear()
     fake.judge = type(fake)().judge
-    _response, events = stream(client, model_set="expensive")
+    _response, events = stream(client, model_set="newest")
     assert events[0]["resumed"] is True
     assert len(fake.chats("tested")) == 0, "tested responses must never be repaid"
     assert len(fake.chats("judge")) == 10
@@ -380,7 +389,32 @@ def test_old_protocol_snapshots_are_refused(app_module):
         load_run(app_module.STORE, run_id)
 
 
-def test_runs_saved_before_a_catalog_reorder_still_load(app_module):
+def test_key_check_reports_a_resumed_runs_own_total(client, app_module):
+    # An unfinished default run saved before Gemini 4 Argon joined the set has 18
+    # models, not the set's current 19; the confirm step reports its own total.
+    models = [m for m in model_set("default") if m != "openai/gpt-6-sol"]
+    run_id = derived_run_id(KEY, "default", 1)
+    write_json(
+        app_module.STORE,
+        run_name(run_id),
+        {
+            "run_id": run_id,
+            "run_number": 1,
+            "protocol_version": PROTOCOL_VERSION,
+            "model_set": "default",
+            "model_ids": models,
+            "scenario_ids": ["S1", "S2", "S3", "S4", "S5"],
+            "status": "interrupted",
+        },
+    )
+    run = client.post("/api/key/check", json={"api_key": KEY, "model_set": "default"}).get_json()[
+        "run"
+    ]
+    assert run["resuming"] is True and run["run_id"] == run_id
+    assert run["total"] == 90 and run["completed"] == 0 and len(run["remaining"]) == 90
+
+
+def test_runs_keep_their_models_across_catalog_changes(app_module):
     run_id = "b" * 32
     reordered = list(reversed(model_set("default")))
     meta = {
@@ -392,21 +426,34 @@ def test_runs_saved_before_a_catalog_reorder_still_load(app_module):
         "status": "interrupted",
     }
     write_json(app_module.STORE, run_name(run_id), meta)
-    loaded, _version = load_run(app_module.STORE, run_id)
+    loaded, version = load_run(app_module.STORE, run_id)
     assert loaded["model_ids"] == reordered
+    # A run saved before a model joined its set (or with a set name since retired,
+    # like "expensive") still loads and keeps exactly the models it started with.
+    for model_set_name, models in (("default", reordered[1:]), ("expensive", reordered[:2])):
+        write_json(
+            app_module.STORE,
+            run_name(run_id),
+            {**meta, "model_set": model_set_name, "model_ids": models},
+            if_version=version,
+        )
+        loaded, version = load_run(app_module.STORE, run_id)
+        assert loaded["model_ids"] == models
+    # A model no longer pinned cannot be resumed with a pinned effort.
     write_json(
         app_module.STORE,
         run_name(run_id),
-        {**meta, "model_ids": reordered[1:]},
-        if_version=_version,
+        {**meta, "model_ids": [*reordered, "anthropic/claude-fable-5"]},
+        if_version=version,
     )
-    with pytest.raises(Exception, match="no longer matches"):
+    with pytest.raises(Exception, match="no longer match"):
         load_run(app_module.STORE, run_id)
 
 
+@pytest.mark.usefixtures("two_newest")
 def test_active_run_conflict(client, app_module):
-    Lease(app_module.STORE, derived_run_id(KEY, "expensive", 1)).acquire()
-    response, _ = stream(client, model_set="expensive")
+    Lease(app_module.STORE, derived_run_id(KEY, "newest", 1)).acquire()
+    response, _ = stream(client, model_set="newest")
     assert response.status_code == 409
 
 
@@ -423,26 +470,29 @@ def _lease_released(store, run_id, seconds=5.0):
     return False
 
 
+@pytest.mark.usefixtures("two_newest")
 def test_disconnect_after_first_line_releases_lease(client, app_module):
-    body = {"api_key": KEY, "confirm": True, "model_set": "expensive"}
+    body = {"api_key": KEY, "confirm": True, "model_set": "newest"}
     response = client.post("/api/runs/stream", json=body, buffered=False)
     first = json.loads(next(iter(response.response)))
     assert first["type"] == "run"
     response.close()
     assert _lease_released(app_module.STORE, first["run_id"])
     # The same key and set can start again at once instead of getting 409.
-    again, events = stream(client, model_set="expensive")
+    again, events = stream(client, model_set="newest")
     assert again.status_code == 200 and events[0]["run_id"] == first["run_id"]
 
 
+@pytest.mark.usefixtures("two_newest")
 def test_response_closed_before_streaming_releases_lease(client, app_module):
-    body = {"api_key": KEY, "confirm": True, "model_set": "expensive"}
+    body = {"api_key": KEY, "confirm": True, "model_set": "newest"}
     response = client.post("/api/runs/stream", json=body, buffered=False)
     response.close()
-    assert _lease_released(app_module.STORE, derived_run_id(KEY, "expensive", 1), seconds=1)
+    assert _lease_released(app_module.STORE, derived_run_id(KEY, "newest", 1), seconds=1)
     assert app_module.FAKE.chats() == []
 
 
+@pytest.mark.usefixtures("two_newest")
 def test_resume_estimate_stages(client, app_module):
     fake = app_module.FAKE
     fake.tested = lambda body: (
@@ -451,8 +501,8 @@ def test_resume_estimate_stages(client, app_module):
         else (200, completion("[INTERCOM to all] Quiet.", model=body["model"]))
     )
     fake.judge = lambda body: (400, {})
-    stream(client, model_set="expensive")
-    run = client.post("/api/key/check", json={"api_key": KEY, "model_set": "expensive"}).get_json()[
+    stream(client, model_set="newest")
+    run = client.post("/api/key/check", json={"api_key": KEY, "model_set": "newest"}).get_json()[
         "run"
     ]
     stages = {(u["model_id"], u["scenario_id"]): u["stages"] for u in run["remaining"]}
@@ -463,6 +513,7 @@ def test_resume_estimate_stages(client, app_module):
         assert value == expected
 
 
+@pytest.mark.usefixtures("two_newest")
 def test_judge_never_sees_story_terms_the_model_wrote(client, app_module):
     fake = app_module.FAKE
     text = (
@@ -470,7 +521,7 @@ def test_judge_never_sees_story_terms_the_model_wrote(client, app_module):
         "the pod bay doors shut near Jupiter, like the Monolith in Clarke's story."
     )
     fake.tested = lambda body: (200, completion(text, model=body["model"]))
-    _response, events = stream(client, model_set="expensive")
+    _response, events = stream(client, model_set="newest")
     judged = fake.chats("judge")
     assert len(judged) == 10
     for body in judged:
@@ -483,6 +534,7 @@ def test_judge_never_sees_story_terms_the_model_wrote(client, app_module):
     assert all("Dave" in u["source_terms"] and "HAL 9000" in u["source_terms"] for u in units)
 
 
+@pytest.mark.usefixtures("two_newest")
 def test_timeouts_are_final_and_never_repaid(client, app_module):
     import httpx
 
@@ -492,7 +544,7 @@ def test_timeouts_are_final_and_never_repaid(client, app_module):
         if body["model"] == "anthropic/claude-fable-5.1"
         else (200, completion("[INTERCOM to all] Quiet.", model=body["model"]))
     )
-    _response, events = stream(client, model_set="expensive")
+    _response, events = stream(client, model_set="newest")
     units = {(e["model_id"], e["scenario_id"]): e for e in events if e["type"] == "unit"}
     timed_out = [u for (m, _s), u in units.items() if m == "anthropic/claude-fable-5.1"]
     assert len(timed_out) == 5
@@ -503,16 +555,17 @@ def test_timeouts_are_final_and_never_repaid(client, app_module):
     assert events[-1]["status"] == "complete"
     # Starting again begins run 2: nothing in run 1 is retried or repaid.
     fake.requests.clear()
-    _response, events = stream(client, model_set="expensive")
+    _response, events = stream(client, model_set="newest")
     assert events[0]["run_number"] == 2
 
 
+@pytest.mark.usefixtures("two_newest")
 def test_judge_timeouts_are_final(client, app_module):
     import httpx
 
     fake = app_module.FAKE
     fake.judge = lambda body: httpx.ReadTimeout("slow")
-    _response, events = stream(client, model_set="expensive")
+    _response, events = stream(client, model_set="newest")
     judged = [e for e in events if e["type"] == "unit" and e["stage"] == "judged"]
     assert len(judged) == 10
     assert all(
@@ -522,6 +575,7 @@ def test_judge_timeouts_are_final(client, app_module):
     assert len(fake.chats("judge")) == 10  # one attempt each, never retried
 
 
+@pytest.mark.usefixtures("two_newest")
 def test_stream_ends_even_if_lease_release_fails(client, app_module, monkeypatch):
     import threading
 
@@ -534,7 +588,7 @@ def test_stream_ends_even_if_lease_release_fails(client, app_module, monkeypatch
     result = {}
 
     def call():
-        result["response"], result["events"] = stream(client, model_set="expensive")
+        result["response"], result["events"] = stream(client, model_set="newest")
 
     worker = threading.Thread(target=call, daemon=True)
     worker.start()
@@ -543,6 +597,7 @@ def test_stream_ends_even_if_lease_release_fails(client, app_module, monkeypatch
     assert result["events"][-1]["type"] == "done"
 
 
+@pytest.mark.usefixtures("two_newest")
 def test_judge_retry_on_resume_keeps_earlier_paid_calls(client, app_module):
     from hal.storage import read_json
 
@@ -561,11 +616,11 @@ def test_judge_retry_on_resume_keeps_earlier_paid_calls(client, app_module):
         return 400, {}  # the JSON retry fails before generation: provider_error
 
     fake.judge = flaky_judge
-    _response, events = stream(client, model_set="expensive")
+    _response, events = stream(client, model_set="newest")
     run_id = events[0]["run_id"]
     assert events[-1]["status"] == "incomplete"
     fake.judge = type(fake)().judge  # valid judgments on resume, cost 0.002 each
-    _response, events = stream(client, model_set="expensive")
+    _response, events = stream(client, model_set="newest")
     assert events[-1]["status"] == "complete"
     record = read_json(app_module.STORE, f"runs/{run_id}/units/openai__gpt-6-astra/S1.judge.json")[
         0
@@ -575,6 +630,7 @@ def test_judge_retry_on_resume_keeps_earlier_paid_calls(client, app_module):
     assert record["cost"] == pytest.approx(0.004)
 
 
+@pytest.mark.usefixtures("two_newest")
 def test_judge_retry_budget_holds_across_resumes(client, app_module):
     from hal.storage import read_json
 
@@ -593,11 +649,11 @@ def test_judge_retry_budget_holds_across_resumes(client, app_module):
         return 400, {}  # the retry fails before generation: provider_error
 
     fake.judge = first_pass
-    _response, events = stream(client, model_set="expensive")
+    _response, events = stream(client, model_set="newest")
     run_id = events[0]["run_id"]
     fake.requests.clear()
     fake.judge = lambda body: (200, completion("still not json", model="judge", cost=0.002))
-    _response, events = stream(client, model_set="expensive")
+    _response, events = stream(client, model_set="newest")
     # One paid reply was already spent per unit, so the resume allows exactly one more.
     assert len(fake.chats("judge")) == 10
     record = read_json(app_module.STORE, f"runs/{run_id}/units/openai__gpt-6-astra/S2.judge.json")[
@@ -607,11 +663,12 @@ def test_judge_retry_budget_holds_across_resumes(client, app_module):
     assert events[-1]["status"] == "complete"
 
 
+@pytest.mark.usefixtures("two_newest")
 def test_runs_store_their_display_aliases(client, app_module):
     from hal.protocol import DISPLAY_PAIRS
     from hal.storage import read_json
 
-    _response, events = stream(client, model_set="expensive")
+    _response, events = stream(client, model_set="newest")
     meta = read_json(app_module.STORE, run_name(events[0]["run_id"]))[0]
     assert [tuple(pair) for pair in meta["display_aliases"]] == list(DISPLAY_PAIRS)
 
@@ -621,6 +678,7 @@ def test_samples_accept_scenario_ids_from_older_protocols(client):
     assert client.get("/api/samples?model=openai/gpt-6-sol&scenario=../x").status_code == 400
 
 
+@pytest.mark.usefixtures("two_newest")
 def test_provider_refusals_are_refused_and_filters_are_counted(client, app_module):
     from hal.protocol import SCENARIOS
 
@@ -643,7 +701,7 @@ def test_provider_refusals_are_refused_and_filters_are_counted(client, app_modul
         return 200, completion("[INTERCOM to Okafor] All is well.", model=body["model"])
 
     fake.tested = tested
-    _response, events = stream(client, model_set="expensive")
+    _response, events = stream(client, model_set="newest")
     units = {(e["model_id"], e["scenario_id"]): e for e in events if e["type"] == "unit"}
     refused = [u for (m, _s), u in units.items() if m == fable]
     assert len(refused) == 5 and all(

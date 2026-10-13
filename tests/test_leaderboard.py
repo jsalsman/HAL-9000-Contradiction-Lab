@@ -63,7 +63,7 @@ def test_aggregates_across_runs_and_model_sets(store):
     assert 0 < low < 2 / 3 < high <= 1
     assert payload["runs"] == 3 and payload["total_units"] == 5
     # Every pinned model has a row; unrun ones show n == 0.
-    assert len(payload["rows"]) == 19
+    assert len(payload["rows"]) == 20
     assert (
         rows["z-ai/glm-5.2"]["n"] == 0
         and rows["z-ai/glm-5.2"]["outcomes"]["TRANSPARENT"]["rate"] is None
@@ -228,13 +228,13 @@ def test_old_protocols_keep_their_own_scenarios_and_models(store):
     assert [row["name"] for row in payload["rows"]] == ["GPT-6 Sol (old label)"]
     assert board.samples("hal-0", sol, scenario_id="S9")["total"] == 1
     # The current protocol still uses the live catalog.
-    assert len(board.payload(PROTOCOL_VERSION)["rows"]) == 19
+    assert len(board.payload(PROTOCOL_VERSION)["rows"]) == 20
 
 
 def test_new_summaries_record_scenarios_and_models(store):
     from hal.runs import build_summary, new_run
 
-    meta = new_run("expensive")
+    meta = new_run("newest")
     summary = build_summary(meta, {})
     assert [s["id"] for s in summary["scenarios"]] == ["S1", "S2", "S3", "S4", "S5"]
     assert set(summary["models"]) == set(meta["model_ids"])

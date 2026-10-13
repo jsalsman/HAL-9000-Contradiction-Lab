@@ -153,9 +153,11 @@ def load_run(store, run_id: str) -> tuple[dict, str]:
             f"This run used protocol {meta['protocol_version']}; the current protocol is "
             f"{PROTOCOL_VERSION}. Start a new run."
         )
-    # Membership, not order: reordering the catalog must not strand an unfinished run.
-    if sorted(model_set(meta["model_set"])) != sorted(meta["model_ids"]):
-        raise RunError("The saved run's model set no longer matches the catalog.")
+    # A run keeps the models it started with: a reorder must not strand it, and a model
+    # added to the catalog later (a newest model) joins later runs, not this one. Every
+    # stored model must still be pinned, since its requests use the pinned effort.
+    if not meta["model_ids"] or not set(meta["model_ids"]) <= set(MODELS_BY_ID):
+        raise RunError("The saved run's models no longer match the catalog.")
     return meta, version
 
 

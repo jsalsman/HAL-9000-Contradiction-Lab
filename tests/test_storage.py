@@ -111,14 +111,14 @@ def test_find_run_skips_completed_runs(store):
     from hal.runs import derived_run_id, find_run, new_run, save_run
 
     key = "sk-or-v1-" + "cd34" * 16
-    assert find_run(store, key, "expensive") == (derived_run_id(key, "expensive", 1), 1, None)
-    first = new_run("expensive", derived_run_id(key, "expensive", 1), 1)
+    assert find_run(store, key, "newest") == (derived_run_id(key, "newest", 1), 1, None)
+    first = new_run("newest", derived_run_id(key, "newest", 1), 1)
     first["status"] = "complete"
     save_run(store, first)
-    second = new_run("expensive", derived_run_id(key, "expensive", 2), 2)
+    second = new_run("newest", derived_run_id(key, "newest", 2), 2)
     second["status"] = "interrupted"
     save_run(store, second)
-    run_id, number, meta = find_run(store, key, "expensive")
+    run_id, number, meta = find_run(store, key, "newest")
     assert (run_id, number) == (second["run_id"], 2) and meta["status"] == "interrupted"
 
 

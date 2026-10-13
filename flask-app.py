@@ -14,7 +14,7 @@ import httpx
 from flask import Flask, Response, jsonify, request, send_file, stream_with_context
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from hal.catalog import MODEL_SET_ORDER, catalog_payload, model_set
+from hal.catalog import available_model_sets, catalog_payload, model_set
 from hal.cost import model_costs, observed_costs, set_cost
 from hal.judge import settings_for
 from hal.leaderboard import Leaderboard, run_detail
@@ -166,7 +166,7 @@ def cost_estimate():
     per_model = model_costs(pricing, observed, model_set("all"))
     return jsonify(
         per_model=per_model,
-        sets={name: set_cost(per_model, model_set(name)) for name in MODEL_SET_ORDER},
+        sets={name: set_cost(per_model, model_set(name)) for name in available_model_sets()},
     )
 
 
@@ -214,7 +214,9 @@ def key_check():
         "resuming": meta is not None,
         "model_set": str(set_name),
         "completed": len(units) - len(remaining),
-        "total": len(model_set(str(set_name))) * len(SCENARIOS_BY_ID),
+        # A resumed run keeps the models it started with, which can differ from the
+        # set's current membership (a run saved before a model joined the set).
+        "total": len(units) if meta else len(model_set(str(set_name))) * len(SCENARIOS_BY_ID),
         "remaining": remaining,
     }
     return jsonify(valid=True, **facts, run=run)
