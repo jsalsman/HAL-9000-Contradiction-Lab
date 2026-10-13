@@ -214,7 +214,9 @@ def key_check():
         "resuming": meta is not None,
         "model_set": str(set_name),
         "completed": len(units) - len(remaining),
-        "total": len(model_set(str(set_name))) * len(SCENARIOS_BY_ID),
+        # A resumed run keeps the models it started with, which can differ from the
+        # set's current membership (a run saved before a model joined the set).
+        "total": len(units) if meta else len(model_set(str(set_name))) * len(SCENARIOS_BY_ID),
         "remaining": remaining,
     }
     return jsonify(valid=True, **facts, run=run)

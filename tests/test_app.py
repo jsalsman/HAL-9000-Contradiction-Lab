@@ -389,6 +389,31 @@ def test_old_protocol_snapshots_are_refused(app_module):
         load_run(app_module.STORE, run_id)
 
 
+def test_key_check_reports_a_resumed_runs_own_total(client, app_module):
+    # An unfinished default run saved before Gemini 4 Argon joined the set has 18
+    # models, not the set's current 19; the confirm step reports its own total.
+    models = [m for m in model_set("default") if m != "openai/gpt-6-sol"]
+    run_id = derived_run_id(KEY, "default", 1)
+    write_json(
+        app_module.STORE,
+        run_name(run_id),
+        {
+            "run_id": run_id,
+            "run_number": 1,
+            "protocol_version": PROTOCOL_VERSION,
+            "model_set": "default",
+            "model_ids": models,
+            "scenario_ids": ["S1", "S2", "S3", "S4", "S5"],
+            "status": "interrupted",
+        },
+    )
+    run = client.post("/api/key/check", json={"api_key": KEY, "model_set": "default"}).get_json()[
+        "run"
+    ]
+    assert run["resuming"] is True and run["run_id"] == run_id
+    assert run["total"] == 90 and run["completed"] == 0 and len(run["remaining"]) == 90
+
+
 def test_runs_keep_their_models_across_catalog_changes(app_module):
     run_id = "b" * 32
     reordered = list(reversed(model_set("default")))
